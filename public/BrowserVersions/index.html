@@ -123,13 +123,28 @@
   <div class="toast" id="toast">—</div>
 
   <script>
-    // Prevent scrolling only when touching the game wrapper area
-    var gameWrapper = document.getElementById('gameWrapper');
-    if (gameWrapper) {
-      gameWrapper.addEventListener('touchmove', function(e) {
+    // Block page scroll when touching the game area.
+    // The iframe swallows its own touch events so we place a transparent
+    // overlay on top of it that captures touches and prevents scrolling,
+    // then briefly lets pointer events through so the game still gets input.
+    (function() {
+      var wrapper = document.getElementById('gameWrapper');
+      if (!wrapper) return;
+
+      var blocker = document.createElement('div');
+      blocker.style.cssText = 'position:absolute;inset:0;z-index:999;touch-action:none;';
+      wrapper.appendChild(blocker);
+
+      blocker.addEventListener('touchstart', function(e) {
+        // Pass the touch through to the iframe by briefly hiding the blocker
+        blocker.style.pointerEvents = 'none';
+        setTimeout(function() { blocker.style.pointerEvents = ''; }, 0);
+      }, { passive: true });
+
+      blocker.addEventListener('touchmove', function(e) {
         e.preventDefault();
       }, { passive: false });
-    }
+    })();
 
     const $ = (sel) => document.querySelector(sel);
     const els = {
