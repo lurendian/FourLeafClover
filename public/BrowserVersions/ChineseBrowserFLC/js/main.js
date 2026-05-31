@@ -7,17 +7,43 @@ PluginManager.setup($plugins);
 //=============================================================================
 // Audio Preloader
 //
-// Hooks into RPG Maker's AudioManager to intercept every audio file it loads
-// and pre-fetches + decodes it via Web Audio immediately, so subsequent plays
-// are instant. Reports progress to the parent page via postMessage.
+// Pre-fetches and decodes the most critical audio files immediately on boot
+// before RPG Maker requests them, so playback is instant when needed.
+// Also hooks AudioManager.createBuffer to preload any file the moment RPG
+// Maker first requests it, caching the decoded buffer for instant reuse.
+// Reports progress to the parent page via postMessage.
 //=============================================================================
 (function() {
     'use strict';
 
-    var _preloadCtx = null;
-    var _preloaded  = {};
-    var _total      = 0;
-    var _loaded     = 0;
+    // Critical files known from System.json — fetched immediately on boot
+    // before the game engine even starts, eliminating the first-play delay.
+    var CRITICAL_BGM = ['MainTitle','Battle3','Ship1','Ship2','Ship3'];
+    var CRITICAL_ME  = ['Victory1','Defeat1','Gameover2'];
+    var CRITICAL_SE  = ['Cursor2','Decision1','Cancel2','Buzzer1','Equip1',
+                        'Save','Load','Battle1','Run','Attack3','Damage4',
+                        'Collapse1','Collapse2','Collapse3','Damage5',
+                        'Recovery','Miss','Evasion1','Evasion2','Reflection',
+                        'Shop1','Item3'];
+
+    var _ctx       = null;
+    var _cache     = {}; // path -> decoded AudioBuffer
+    var _fetching  = {}; // path -> true (in-flight)
+    var _total     = 0;
+    var _loaded    = 0;
+
+    function getCtx() {
+        if (_ctx) return _ctx;
+        var AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return null;
+        try { _ctx = new AC(); } catch(e) {}
+        return _ctx;
+    }
+
+    function getExt() {
+        var a = document.createElement('audio');
+        return a.canPlayType('audio/ogg') ? '.rpgmvo' : '.rpgmvm';
+    }
 
     function sendProgress() {
         try {
@@ -31,17 +57,9 @@ PluginManager.setup($plugins);
         } catch(e) {}
     }
 
-    function getAudioContext() {
-        if (_preloadCtx) return _preloadCtx;
-        var AC = window.AudioContext || window.webkitAudioContext;
-        if (!AC) return null;
-        _preloadCtx = new AC();
-        return _preloadCtx;
-    }
-
-    function preloadFile(path) {
-        if (_preloaded[path]) return;
-        _preloaded[path] = true;
+    function preload(path) {
+        if (_cache[path] || _fetching[path]) return;
+        _fetching[path] = true;
         _total++;
         sendProgress();
 
@@ -49,74 +67,66 @@ PluginManager.setup($plugins);
         xhr.open('GET', path, true);
         xhr.responseType = 'arraybuffer';
         xhr.onload = function() {
-            var ctx = getAudioContext();
-            if (xhr.status === 200 && ctx) {
-                ctx.decodeAudioData(xhr.response,
-                    function(buf) {
-                        // Store decoded buffer so WebAudio can reuse it
-                        try {
-                            if (WebAudio && WebAudio._masterVolume !== undefined) {
-                                // RPG Maker will load it fresh anyway; we just
-                                // wanted the browser to cache the decoded bytes
-                            }
-                        } catch(e) {}
-                        _loaded++; sendProgress();
-                    },
-                    function() { _loaded++; sendProgress(); }
-                );
-            } else {
-                _loaded++; sendProgress();
-            }
+            if (xhr.status !== 200) { _loaded++; sendProgress(); return; }
+            var ctx = getCtx();
+            if (!ctx) { _loaded++; sendProgress(); return; }
+            ctx.decodeAudioData(xhr.response,
+                function(buf) { _cache[path] = buf; _loaded++; sendProgress(); },
+                function()    {                      _loaded++; sendProgress(); }
+            );
         };
         xhr.onerror = function() { _loaded++; sendProgress(); };
         try { xhr.send(); } catch(e) { _loaded++; sendProgress(); }
     }
 
-    // Hook AudioManager.createBuffer — called every time RPG Maker loads audio
-    var _hookInstalled = false;
-    function installHook() {
-        if (_hookInstalled || typeof AudioManager === 'undefined') return;
-        _hookInstalled = true;
-
-        var _orig = AudioManager.createBuffer;
-        AudioManager.createBuffer = function(folder, name) {
-            if (name) {
-                // Determine extension the same way RPG Maker does
-                var audio = document.createElement('audio');
-                var ext = audio.canPlayType('audio/ogg') ? '.rpgmvo' : '.rpgmvm';
-                preloadFile(folder + '/' + name + ext);
-            }
-            return _orig.apply(this, arguments);
-        };
-
-        // Also preload title BGM/BGS immediately from System data
-        var trySystem = function() {
-            if (window.$dataSystem) {
-                var audio = document.createElement('audio');
-                var ext = audio.canPlayType('audio/ogg') ? '.rpgmvo' : '.rpgmvm';
-                var s = window.$dataSystem;
-                if (s.titleBgm && s.titleBgm.name) preloadFile('audio/bgm/' + s.titleBgm.name + ext);
-                if (s.titleBgs && s.titleBgs.name) preloadFile('audio/bgs/' + s.titleBgs.name + ext);
-                if (s.battleBgm && s.battleBgm.name) preloadFile('audio/bgm/' + s.battleBgm.name + ext);
-                if (s.defeatMe  && s.defeatMe.name)  preloadFile('audio/me/'  + s.defeatMe.name  + ext);
-                if (s.victoryMe && s.victoryMe.name) preloadFile('audio/me/'  + s.victoryMe.name + ext);
-                if (s.gameoverMe && s.gameoverMe.name) preloadFile('audio/me/' + s.gameoverMe.name + ext);
-            } else {
-                setTimeout(trySystem, 200);
-            }
-        };
-        setTimeout(trySystem, 200);
+    function preloadList(folder, names, ext) {
+        names.forEach(function(n) { if (n) preload(folder + '/' + n + ext); });
     }
 
-    // Poll until AudioManager is available then install the hook
-    var _poll = setInterval(function() {
-        if (typeof AudioManager !== 'undefined') {
-            clearInterval(_poll);
-            installHook();
+    // Start fetching critical files immediately
+    var ext = getExt();
+    preloadList('audio/bgm', CRITICAL_BGM, ext);
+    preloadList('audio/me',  CRITICAL_ME,  ext);
+    preloadList('audio/se',  CRITICAL_SE,  ext);
+
+    // Hook AudioManager.createBuffer so every file RPG Maker loads for the
+    // first time gets pre-fetched and cached for instant subsequent plays.
+    var _hookInstalled = false;
+    var _hookInterval = setInterval(function() {
+        if (typeof AudioManager === 'undefined') return;
+        clearInterval(_hookInterval);
+        if (_hookInstalled) return;
+        _hookInstalled = true;
+
+        var _origCreate = AudioManager.createBuffer;
+        AudioManager.createBuffer = function(folder, name) {
+            if (name) preload(folder + '/' + name + getExt());
+            return _origCreate.apply(this, arguments);
+        };
+
+        // Patch WebAudio to hand back our cached buffer when available,
+        // skipping the XHR+decode step RPG Maker would otherwise do.
+        if (typeof WebAudio !== 'undefined' && WebAudio.prototype) {
+            var _origLoad = WebAudio.prototype._load;
+            if (_origLoad) {
+                WebAudio.prototype._load = function(url) {
+                    var cached = _cache[url];
+                    if (cached && this._context) {
+                        try {
+                            this._buffer = cached;
+                            this._totalTime = cached.duration;
+                            this._onLoad();
+                            return;
+                        } catch(e) {}
+                    }
+                    return _origLoad.apply(this, arguments);
+                };
+            }
         }
     }, 100);
 
 })();
+
 
 
 
