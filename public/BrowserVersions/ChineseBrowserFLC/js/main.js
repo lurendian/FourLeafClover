@@ -39,6 +39,34 @@ window.onload = function() {
     var _renderCount = 0;
     var _revealed    = false;
 
+    // Cache-bust all video sources on every load so the browser never serves
+    // a stale/partial cached response for the title screen background video.
+    (function bustVideoCache() {
+        var _origCreateElement = document.createElement.bind(document);
+        document.createElement = function(tag) {
+            var el = _origCreateElement(tag);
+            if (typeof tag === 'string' && tag.toLowerCase() === 'video') {
+                var _origSetAttribute = el.setAttribute.bind(el);
+                el.setAttribute = function(name, value) {
+                    if (name === 'src' && value && !/[?&]_t=/.test(value)) {
+                        value = value + (value.indexOf('?') >= 0 ? '&' : '?') + '_t=' + Date.now();
+                    }
+                    return _origSetAttribute(name, value);
+                };
+                Object.defineProperty(el, 'src', {
+                    set: function(value) {
+                        if (value && !/[?&]_t=/.test(value)) {
+                            value = value + (value.indexOf('?') >= 0 ? '&' : '?') + '_t=' + Date.now();
+                        }
+                        _origSetAttribute('src', value);
+                    },
+                    get: function() { return el.getAttribute('src') || ''; }
+                });
+            }
+            return el;
+        };
+    })();
+
     function revealCanvas() {
         if (_revealed) return;
         _revealed = true;
@@ -46,6 +74,12 @@ window.onload = function() {
         setTimeout(function() {
             if (overlay.parentNode) overlay.parentNode.removeChild(overlay);
         }, 600);
+        // Tell the parent wrapper the title screen is ready
+        try {
+            if (window.parent && window.parent !== window) {
+                window.parent.postMessage({ type: 'flc_scene_ready' }, '*');
+            }
+        } catch(e) {}
     }
 
     var _origRenderScene = SceneManager.renderScene;
