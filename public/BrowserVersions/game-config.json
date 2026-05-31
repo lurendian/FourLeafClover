@@ -5,7 +5,7 @@
     "credits": "由 Tablet pro 移植",
     "releaseDate": "2024年2月8日",
     "note": "若您使用的是行動裝置，請同時用兩根手指輕觸螢幕以開啟選單。如有任何問題，請至此處回報：https://lurendian.atabook.org/",
-    "gameUrl": "https://ditingalwaysasksdadi.lurendian.workers.dev/BrowserVersions/ChineseBrowserFLC/index.html",
+    "gameUrl": "https://fourleafclover.lurendian.workers.dev/BrowserVersions/ChineseBrowserFLC/index.html",
     "downloadUrl": "https://b2-download-gateway.lurendian.workers.dev/ChineseBrowserFLC.zip",
     "ui": {
       "selectLang": "选择语言",
