@@ -6,6 +6,12 @@ PluginManager.setup($plugins);
 
 window.onload = function() {
     SceneManager.run(Scene_Boot);
+    // Prevent the game page from scrolling on mobile when touched
+    document.documentElement.style.touchAction = 'none';
+    document.body.style.touchAction = 'none';
+    document.addEventListener('touchmove', function(e) {
+        e.preventDefault();
+    }, { passive: false });
 };
 
 //=============================================================================
