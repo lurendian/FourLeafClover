@@ -82,6 +82,11 @@
       .select-option:hover { background: transparent; color: var(--text-primary); }
       .select-option.active:hover { background: var(--bg-btn-hover); color: var(--accent); }
     }
+    .audio-progress-bar { width: 100%; max-width: 1200px; margin-top: 10px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 8px; overflow: hidden; height: 6px; transition: opacity 0.5s ease; }
+    .audio-progress-bar.hidden { opacity: 0; pointer-events: none; }
+    .audio-progress-fill { height: 100%; width: 0%; background: var(--accent); border-radius: 8px; transition: width 0.3s ease; }
+    .audio-progress-label { width: 100%; max-width: 1200px; margin-top: 6px; font-size: 12px; color: var(--text-muted); text-align: center; transition: opacity 0.5s ease; }
+    .audio-progress-label.hidden { opacity: 0; pointer-events: none; }
   </style>
 </head>
 <body>
@@ -120,6 +125,8 @@
     <div class="info-item" style="grid-column: 1 / -1;"><span class="info-label" data-i18n="note">Note</span><span class="info-value note" id="infoNote">—</span></div>
   </div>
   
+  <div class="audio-progress-bar hidden" id="audioProgressBar"><div class="audio-progress-fill" id="audioProgressFill"></div></div>
+  <div class="audio-progress-label hidden" id="audioProgressLabel">—</div>
   <div class="toast" id="toast">—</div>
 
   <script>
@@ -202,6 +209,34 @@
       applyLang(code); 
       showToast(config[code].ui?.langSwitched || 'Language changed'); 
     };
+
+    const audioBar   = document.getElementById('audioProgressBar');
+    const audioFill  = document.getElementById('audioProgressFill');
+    const audioLabel = document.getElementById('audioProgressLabel');
+
+    function updateAudioProgress(loaded, total) {
+      if (!audioBar || !audioFill || !audioLabel || total === 0) return;
+      const pct = Math.round((loaded / total) * 100);
+      audioBar.classList.remove('hidden');
+      audioLabel.classList.remove('hidden');
+      audioFill.style.width = pct + '%';
+      if (loaded >= total) {
+        audioLabel.textContent = '✓ 音频已加载';
+        setTimeout(function() {
+          audioBar.classList.add('hidden');
+          audioLabel.classList.add('hidden');
+        }, 2000);
+      } else {
+        audioLabel.textContent = '正在加载音频… ' + loaded + ' / ' + total;
+      }
+    }
+
+    window.addEventListener('message', function(e) {
+      if (!els.frame || e.source !== els.frame.contentWindow) return;
+      if (e.data && e.data.type === 'flc_audio_progress') {
+        updateAudioProgress(e.data.loaded, e.data.total);
+      }
+    });
 
     const loadGame = (data) => {
       if (!els.wrapper || !els.frame) return;
