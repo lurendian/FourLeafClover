@@ -1,0 +1,34 @@
+{
+  "zh": {
+    "name": "中文",
+    "version": "第1-2章",
+    "credits": "由 Tablet pro 移植",
+    "releaseDate": "2024年2月8日",
+    "note": "若您使用的是行動裝置，請同時用兩根手指輕觸螢幕以開啟選單。如有任何問題，請至此處回報：https://lurendian.atabook.org/",
+    "gameUrl": "https://ditingalwaysasksdadi.lurendian.workers.dev/BrowserVersions/ChineseBrowserFLC/index.html",
+    "downloadUrl": "https://b2-download-gateway.lurendian.workers.dev/ChineseBrowserFLC.zip",
+    "ui": {
+      "selectLang": "选择语言",
+      "releaseDate": "发布日期",
+      "credits": "鸣谢",
+      "version": "版本",
+      "note": "说明",
+      "uiVisible": "界面已显示",
+      "uiHidden": "界面已隐藏",
+      "downloadStarted": "下载已开始",
+      "openNewTab": "已在新标签页打开",
+      "fsNotSupported": "全屏不可用",
+      "orientLocked": "已锁定横屏",
+      "langSwitched": "语言已切换至中文",
+      "tapToPlay": "点击开始游戏",
+      "pageTitle": "Four Leaf Clover - Game Player",
+      "fullscreenTitle": "全屏 (F)",
+      "hideUiTitle": "隐藏界面 (H)",
+      "downloadTitle": "下载游戏",
+      "errorInvalidPage": "错误：页面结构无效。",
+      "errorLoadGame": "游戏加载失败，请检查链接。",
+      "loadingTimeout": "加载超时",
+      "audioUnlocked": "音频已解锁"
+    }
+  }
+}

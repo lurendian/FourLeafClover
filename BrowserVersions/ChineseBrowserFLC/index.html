@@ -1,0 +1,103 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <meta charset="UTF-8">
+        <meta name="apple-mobile-web-app-capable" content="yes">
+        <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+        <meta name="viewport" content="user-scalable=no">
+        <link rel="icon" href="icon/icon.png" type="image/png">
+        <link rel="apple-touch-icon" href="icon/icon.png">
+        <link rel="stylesheet" type="text/css" href="fonts/gamefont.css">
+        <title>四叶苜蓿-第二章</title>
+    </head>
+    <body style="background-color: black">
+        <script type="text/javascript" src="js/libs/pixi.js"></script>
+        <script type="text/javascript" src="js/libs/pixi-tilemap.js"></script>
+        <script type="text/javascript" src="js/libs/pixi-picture.js"></script>
+        <script type="text/javascript" src="js/libs/fpsmeter.js"></script>
+        <script type="text/javascript" src="js/libs/lz-string.js"></script>
+        <script type="text/javascript" src="js/libs/iphone-inline-video.browser.js"></script>
+        <script type="text/javascript" src="js/rpg_core.js"></script>
+        <script type="text/javascript" src="js/rpg_managers.js"></script>
+        <script type="text/javascript" src="js/rpg_objects.js"></script>
+        <script type="text/javascript" src="js/rpg_scenes.js"></script>
+        <script type="text/javascript" src="js/rpg_sprites.js"></script>
+        <script type="text/javascript" src="js/rpg_windows.js"></script>
+        <script type="text/javascript" src="js/plugins.js"></script>
+        <script type="text/javascript" src="js/main.js"></script>
+		(function() {
+  'use strict';
+
+  var TIMEOUT_MS = 15000;
+  var PIXEL_THRESHOLD = 20;   // non-black pixels in 64x64 centre sample
+
+  var startTime = Date.now();
+  var overlay = null;
+
+  function createOverlay() {
+    overlay = document.createElement('div');
+    overlay.style.cssText = [
+      'position:fixed','inset:0','background:#000',
+      'z-index:99999','transition:opacity 0.5s ease',
+      'opacity:1','pointer-events:none'
+    ].join(';');
+    document.body.appendChild(overlay);
+  }
+
+  function fadeOut() {
+    if (!overlay) return;
+    overlay.style.opacity = '0';
+    setTimeout(function() {
+      if (overlay && overlay.parentNode) overlay.parentNode.removeChild(overlay);
+      overlay = null;
+    }, 550);
+  }
+
+  function hasContent(cvs) {
+    try {
+      var w = cvs.width, h = cvs.height;
+      if (!w || !h) return false;
+
+      // RPG Maker MV uses WebGL (PIXI.js)
+      var gl = cvs.getContext('webgl') || cvs.getContext('experimental-webgl');
+      if (gl) {
+        var sw = Math.min(64, w), sh = Math.min(64, h);
+        var sx = Math.floor((w - sw) / 2), sy = Math.floor((h - sh) / 2);
+        var pixels = new Uint8Array(sw * sh * 4);
+        gl.readPixels(sx, sy, sw, sh, gl.RGBA, gl.UNSIGNED_BYTE, pixels);
+        var n = 0;
+        for (var i = 0; i < pixels.length; i += 4) {
+          if (pixels[i] + pixels[i+1] + pixels[i+2] > 15 && ++n >= PIXEL_THRESHOLD) return true;
+        }
+        return false;
+      }
+
+      // Canvas 2D fallback (if ?canvas param is used)
+      var ctx = cvs.getContext('2d');
+      if (!ctx) return false;
+      var d = ctx.getImageData(0, 0, w, h).data;
+      var n2 = 0;
+      for (var j = 0; j < d.length; j += 4) {
+        if (d[j] + d[j+1] + d[j+2] > 15 && ++n2 >= PIXEL_THRESHOLD) return true;
+      }
+      return false;
+    } catch(e) { return true; }
+  }
+
+  function poll() {
+    if (Date.now() - startTime > TIMEOUT_MS) { fadeOut(); return; }
+    var cvs = document.getElementById('GameCanvas') ||
+              document.querySelector('#gameContainer canvas') ||
+              document.querySelector('canvas');
+    if (cvs && hasContent(cvs)) { fadeOut(); return; }
+    requestAnimationFrame(poll);
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', function() { createOverlay(); poll(); });
+  } else {
+    createOverlay(); poll();
+  }
+})();
+    </body>
+</html>

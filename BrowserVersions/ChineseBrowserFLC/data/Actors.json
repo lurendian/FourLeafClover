@@ -1,0 +1,13 @@
+[
+null,
+{"id":1,"battlerName":"Meimei1","characterIndex":0,"characterName":"Meimei","classId":5,"equips":[0,1,0,0,0],"faceIndex":0,"faceName":"meimei","traits":[{"code":41,"dataId":3,"value":1},{"code":42,"dataId":1,"value":1},{"code":41,"dataId":5,"value":1}],"initialLevel":1,"maxLevel":99,"name":"慕容雪川","nickname":"慕容雪川","note":"","profile":"一只快乐的打工狐。\n简简单单，普普通通，平平凡凡。"},
+{"id":2,"battlerName":"Tuye1","characterIndex":1,"characterName":"Meimei","classId":3,"equips":[0,1,0,6,0],"faceIndex":0,"faceName":"tuye","traits":[{"code":41,"dataId":3,"value":1},{"code":41,"dataId":5,"value":1},{"code":42,"dataId":1,"value":1}],"initialLevel":8,"maxLevel":99,"name":"兔爷","nickname":"兔儿爷","note":"","profile":"京城第一兔！因救治瘟疫得人们供奉。\n目前为爱迷失，请努力找回！"},
+{"id":3,"battlerName":"Actor1_1","characterIndex":0,"characterName":"Actor1","classId":1,"equips":[0,0,0,0,0],"faceIndex":0,"faceName":"Actor1","traits":[],"initialLevel":10,"maxLevel":99,"name":"霍尔德","nickname":"","note":"","profile":""},
+{"id":4,"battlerName":"Tutuoni","characterIndex":7,"characterName":"Meimei","classId":3,"equips":[0,0,0,0,0],"faceIndex":0,"faceName":"tutuoni","traits":[],"initialLevel":1,"maxLevel":99,"name":"兔托尼","nickname":"","note":"","profile":""},
+{"id":5,"battlerName":"Sibuxiang1","characterIndex":2,"characterName":"Sibuxiang1","classId":6,"equips":[1,14,10,12,13],"faceIndex":6,"faceName":"sibuxiang","traits":[{"code":41,"dataId":3,"value":1},{"code":41,"dataId":5,"value":1},{"code":42,"dataId":1,"value":1}],"initialLevel":1,"maxLevel":99,"name":"四不像","nickname":"四不像","note":"","profile":"机缘巧合之下得道成仙。\n鹿人店老板，以救济神兽之名下凡。"},
+{"id":6,"battlerName":"","characterIndex":0,"characterName":"","classId":1,"equips":[0,0,0,0,0],"faceIndex":0,"faceName":"","traits":[],"initialLevel":1,"maxLevel":99,"name":"","nickname":"","note":"","profile":""},
+{"id":7,"battlerName":"","characterIndex":0,"characterName":"","classId":1,"equips":[0,0,0,0,0],"faceIndex":0,"faceName":"","traits":[],"initialLevel":1,"maxLevel":99,"name":"","nickname":"","note":"","profile":""},
+{"id":8,"battlerName":"","characterIndex":0,"characterName":"","classId":1,"equips":[0,0,0,0,0],"faceIndex":0,"faceName":"","traits":[],"initialLevel":1,"maxLevel":99,"name":"","nickname":"","note":"","profile":""},
+{"id":9,"battlerName":"","characterIndex":0,"characterName":"","classId":1,"equips":[0,0,0,0,0],"faceIndex":0,"faceName":"","traits":[],"initialLevel":1,"maxLevel":99,"name":"","nickname":"","note":"","profile":""},
+{"id":10,"battlerName":"","characterIndex":0,"characterName":"","classId":1,"equips":[0,0,0,0,0],"faceIndex":0,"faceName":"","traits":[],"initialLevel":1,"maxLevel":99,"name":"","nickname":"","note":"","profile":""}
+]

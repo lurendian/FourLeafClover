@@ -1,0 +1,345 @@
+<!DOCTYPE html>
+<html lang="zh">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+  <title data-i18n="pageTitle">Four Leaf Clover - Game Player</title>
+  <style>
+    :root {
+      --bg-primary: #0a0e0a; --bg-secondary: #111811; --bg-game: #000;
+      --bg-controls: rgba(17,24,17,.96); --bg-btn: rgba(46,204,113,.12);
+      --bg-btn-hover: rgba(46,204,113,.25); --bg-select: rgba(30,40,30,.95);
+      --bg-dropdown: rgba(20,28,20,.98); --text-primary: #e8f5e9;
+      --text-secondary: #81c784; --text-muted: #556b55; --accent: #2ecc71;
+      --accent-glow: rgba(46,204,113,.4); --accent-hover: #27ae60;
+      --border-color: rgba(46,204,113,.15); --radius-game: 20px;
+      --radius-btn: 50%; --radius-controls: 36px; --radius-select: 14px;
+      --shadow-game: 0 16px 60px rgba(0,30,0,.7),0 0 0 1px var(--border-color);
+      --shadow-btn: 0 6px 20px rgba(0,0,0,.4); --glow-btn: 0 0 20px var(--accent-glow);
+      --font: system-ui,-apple-system,'Segoe UI','Microsoft YaHei',sans-serif;
+      --trans-fast: .18s cubic-bezier(.4,0,.2,1); --trans-smooth: .4s cubic-bezier(.4,0,.2,1);
+      --gap-controls: 10px; --pad-controls: 12px 20px; --size-btn: 44px;
+    }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { font-family: var(--font); background: var(--bg-primary); color: var(--text-primary); display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 100vh; padding: 24px; line-height: 1.5; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
+    body::before { content: ''; position: fixed; inset: 0; background: radial-gradient(circle at 20% 80%,rgba(46,204,113,.03) 0%,transparent 20%),radial-gradient(circle at 80% 20%,rgba(46,204,113,.02) 0%,transparent 25%); pointer-events: none; z-index: -1; }
+    .top-bar { width: 100%; max-width: 1200px; margin-bottom: 16px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+    .selector-group { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 200px; }
+    .selector-label { font-size: 13px; color: var(--text-secondary); font-weight: 500; }
+    .custom-select-wrapper { position: relative; }
+    .custom-select-current { padding: 10px 36px 10px 16px; font-size: 15px; font-family: var(--font); color: var(--text-primary); background: var(--bg-select); border: 1px solid var(--border-color); border-radius: var(--radius-select); cursor: pointer; transition: var(--trans-fast); display: flex; align-items: center; user-select: none; }
+    .custom-select-current:hover { border-color: var(--accent); background: rgba(30,40,30,.98); }
+    .custom-select-current.open { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-glow); }
+    .custom-select-current::after { content: ''; position: absolute; right: 14px; top: 50%; transform: translateY(-50%) rotate(45deg); width: 6px; height: 6px; border-right: 2px solid var(--accent); border-bottom: 2px solid var(--accent); transition: var(--trans-fast); }
+    .custom-select-current.open::after { transform: translateY(-50%) rotate(-135deg); }
+    .custom-select-dropdown { position: absolute; top: calc(100% + 6px); left: 0; right: 0; background: var(--bg-dropdown); border: 1px solid var(--border-color); border-radius: 12px; padding: 6px; opacity: 0; visibility: hidden; transform: translateY(-8px); transition: var(--trans-fast); z-index: 2000; box-shadow: 0 8px 30px rgba(0,0,0,.5); max-height: 240px; overflow-y: auto; }
+    .custom-select-dropdown.open { opacity: 1; visibility: visible; transform: translateY(0); }
+    .select-option { padding: 10px 12px; border-radius: 8px; cursor: pointer; transition: var(--trans-fast); }
+    .select-option:hover, .select-option.active { background: var(--bg-btn-hover); color: var(--accent); }
+    .select-option.active { font-weight: 600; }
+    .version-badge { padding: 8px 16px; background: var(--bg-btn); border: 1px solid var(--border-color); border-radius: 20px; font-size: 13px; color: var(--text-secondary); white-space: nowrap; align-self: flex-end; margin-bottom: 6px; }
+    .version-badge.latest { background: linear-gradient(135deg,var(--accent),var(--accent-hover)); color: #0a0e0a; border: none; font-weight: 600; }
+    .game-wrapper { position: relative; width: 100%; max-width: 1200px; aspect-ratio: 16/9; background: var(--bg-game); border-radius: var(--radius-game); overflow: hidden; box-shadow: var(--shadow-game); border: 1px solid var(--border-color); transition: aspect-ratio var(--trans-smooth),max-width var(--trans-smooth); }
+    .game-wrapper:hover { box-shadow: var(--shadow-game),var(--glow-btn); }
+    #gameFrame { width: 100%; height: 100%; border: none; display: block; background: var(--bg-game); overflow: hidden; }
+    .audio-overlay { position: absolute; inset: 0; background: rgba(10,14,10,.85); display: flex; align-items: center; justify-content: center; z-index: 1005; cursor: pointer; color: var(--text-primary); text-align: center; backdrop-filter: blur(8px); transition: opacity .4s ease; }
+    .audio-overlay.hidden { opacity: 0; pointer-events: none; }
+    .audio-overlay-content { display: flex; flex-direction: column; align-items: center; gap: 16px; }
+    .play-icon { width: 80px; height: 80px; border-radius: 50%; background: var(--accent); color: #0a0e0a; display: flex; align-items: center; justify-content: center; font-size: 36px; box-shadow: 0 0 30px var(--accent-glow); transition: transform .2s; }
+    .audio-overlay:active .play-icon { transform: scale(.95); }
+    .game-controls { position: absolute; bottom: 24px; left: 50%; transform: translateX(-50%); display: flex; gap: var(--gap-controls); background: var(--bg-controls); padding: var(--pad-controls); border-radius: var(--radius-controls); z-index: 1000; backdrop-filter: blur(16px); border: 1px solid var(--border-color); transition: opacity .3s ease,transform .3s ease,visibility 0s .3s; visibility: visible; box-shadow: var(--shadow-btn); }
+    .game-controls.hidden { opacity: 0; visibility: hidden; transform: translateX(-50%) translateY(16px); pointer-events: none; transition: opacity .3s ease,transform .3s ease,visibility 0s 0s; }
+    .game-wrapper.ui-hidden .game-controls { opacity: 0!important; visibility: hidden!important; pointer-events: none!important; transform: translateX(-50%) translateY(16px)!important; }
+    .control-btn { background: var(--bg-btn); border: 1px solid var(--border-color); color: var(--text-primary); width: var(--size-btn); height: var(--size-btn); border-radius: var(--radius-btn); font-size: 20px; cursor: pointer; display: flex; align-items: center; justify-content: center; transition: var(--trans-fast); text-decoration: none; user-select: none; position: relative; overflow: hidden; line-height: 1; -webkit-tap-highlight-color: transparent; }
+    .control-btn::before { content: ''; position: absolute; inset: -2px; background: radial-gradient(circle,var(--accent-glow) 0%,transparent 70%); opacity: 0; transition: var(--trans-fast); border-radius: inherit; pointer-events: none; z-index: -1; }
+    .control-btn:hover { background: var(--bg-btn-hover); border-color: var(--accent); color: var(--accent); transform: scale(1.12) translateY(-2px); box-shadow: var(--glow-btn); }
+    .control-btn:hover::before { opacity: 1; }
+    .control-btn:active { transform: scale(.96); transition-duration: .08s; }
+    #downloadBtn { background: linear-gradient(135deg,var(--accent),var(--accent-hover)); color: #0a0e0a; border: none; font-weight: 700; box-shadow: 0 4px 16px rgba(46,204,113,.35); }
+    #downloadBtn:hover { background: linear-gradient(135deg,var(--accent-hover),#219653); color: #050705; transform: scale(1.12) translateY(-3px); box-shadow: 0 8px 28px rgba(46,204,113,.5); }
+    .info-panel { width: 100%; max-width: 1200px; margin-top: 16px; padding: 14px 20px; background: var(--bg-secondary); border: 1px solid var(--border-color); border-radius: 16px; font-size: 14px; color: var(--text-secondary); display: grid; grid-template-columns: repeat(auto-fit,minmax(200px,1fr)); gap: 12px 24px; }
+    .info-item { display: flex; flex-direction: column; gap: 4px; }
+    .info-label { font-size: 12px; color: var(--text-muted); text-transform: uppercase; letter-spacing: .5px; }
+    .info-value { color: var(--text-primary); font-weight: 500; }
+    .info-value.note { grid-column: 1/-1; margin-top: 4px; line-height: 1.6; white-space: pre-line; }
+    .toast { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%) translateY(100px); background: var(--bg-controls); color: var(--text-primary); padding: 14px 28px; border-radius: 14px; font-size: 14px; z-index: 2000; transition: var(--trans-smooth); box-shadow: var(--shadow-game); border: 1px solid var(--border-color); backdrop-filter: blur(12px); opacity: 0; }
+    .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
+    .game-wrapper.loading #gameFrame { opacity: 0; }
+    .loading-spinner { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 48px; height: 48px; border: 4px solid var(--border-color); border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite; z-index: 10; pointer-events: none; display: block; }
+    .game-wrapper:not(.loading) .loading-spinner { display: none!important; }
+    @keyframes spin { to { transform: translate(-50%,-50%) rotate(360deg); } }
+    @media (max-width: 768px) { 
+      :root { --size-btn: 40px; --pad-controls: 10px 16px; --radius-controls: 32px; --radius-game: 16px; } 
+      .top-bar { flex-direction: column; align-items: stretch; gap: 12px; } 
+      .selector-group { min-width: auto; } 
+      .version-badge { align-self: flex-start; margin-bottom: 0; } 
+      .game-controls { bottom: 16px; } 
+      .info-panel { grid-template-columns: 1fr; } 
+    }
+    @media (max-width: 480px) { :root { --size-btn: 36px; --gap-controls: 8px; } }
+    @media (hover: none) {
+      .control-btn:hover { background: var(--bg-btn); border-color: var(--border-color); color: var(--text-primary); transform: none; box-shadow: var(--shadow-btn); }
+      .control-btn:hover::before { opacity: 0; }
+      .custom-select-current:hover { border-color: var(--border-color); background: var(--bg-select); }
+      .select-option:hover { background: transparent; color: var(--text-primary); }
+      .select-option.active:hover { background: var(--bg-btn-hover); color: var(--accent); }
+    }
+  </style>
+</head>
+<body>
+  <div class="top-bar">
+    <div class="selector-group">
+      <label class="selector-label" data-i18n="selectLang">Select Language</label>
+      <div class="custom-select-wrapper">
+        <div class="custom-select-current" id="langSelector"><span id="currentLangText">—</span></div>
+        <div class="custom-select-dropdown" id="langDropdown"></div>
+      </div>
+    </div>
+    <span class="version-badge" id="versionBadge">—</span>
+  </div>
+  
+  <div class="game-wrapper" id="gameWrapper">
+    <div class="loading-spinner" id="loadingSpinner"></div>
+    <iframe id="gameFrame" src="" allow="autoplay; fullscreen; gamepad" loading="lazy" title="Four Leaf Clover Game" tabindex="0"></iframe>
+    
+    <div class="audio-overlay" id="audioOverlay">
+      <div class="audio-overlay-content">
+        <div class="play-icon">▶</div>
+        <div data-i18n="tapToPlay" style="font-size: 18px; font-weight: 600;">Tap to Play</div>
+      </div>
+    </div>
+
+    <div class="game-controls" id="gameControls">
+      <button class="control-btn" id="fullscreenBtn" data-i18n-title="fullscreenTitle">⛶</button>
+      <button class="control-btn" id="hideUiBtn" data-i18n-title="hideUiTitle">✕</button>
+      <a class="control-btn" id="downloadBtn" href="#" download data-i18n-title="downloadTitle">⬇</a>
+    </div>
+  </div>
+  
+  <div class="info-panel">
+    <div class="info-item"><span class="info-label" data-i18n="releaseDate">Release Date</span><span class="info-value" id="infoDate">—</span></div>
+    <div class="info-item"><span class="info-label" data-i18n="credits">Credits</span><span class="info-value" id="infoCredits">—</span></div>
+    <div class="info-item"><span class="info-label" data-i18n="version">Version</span><span class="info-value" id="infoVersion">—</span></div>
+    <div class="info-item" style="grid-column: 1 / -1;"><span class="info-label" data-i18n="note">Note</span><span class="info-value note" id="infoNote">—</span></div>
+  </div>
+  
+  <div class="toast" id="toast">—</div>
+
+  <script>
+    const $ = (sel) => document.querySelector(sel);
+    const els = {
+      langSelect: $('#langSelector'), dropdown: $('#langDropdown'), currentLang: $('#currentLangText'),
+      badge: $('#versionBadge'), wrapper: $('#gameWrapper'), spinner: $('#loadingSpinner'), frame: $('#gameFrame'),
+      controls: $('#gameControls'), toast: $('#toast'), date: $('#infoDate'), credits: $('#infoCredits'),
+      ver: $('#infoVersion'), note: $('#infoNote'), downloadBtn: $('#downloadBtn'), audioOverlay: $('#audioOverlay')
+    };
+    
+    let currentLang = 'zh'; // Default, will be overridden by URL/JSON logic
+    let uiVisible = true, idleTimer = null, loadTimeout = null;
+    let config = {};
+
+    // 🪄 MAGIC FIX: Automatically strips all trailing/leading spaces from JSON keys and values
+    function cleanJSON(obj) {
+      if (Array.isArray(obj)) return obj.map(cleanJSON);
+      if (obj !== null && typeof obj === 'object') {
+        return Object.keys(obj).reduce((acc, key) => {
+          acc[key.trim()] = cleanJSON(obj[key]);
+          return acc;
+        }, {});
+      }
+      return typeof obj === 'string' ? obj.trim() : obj;
+    }
+
+    const showToast = (msg, dur = 2400) => { 
+      if (!els.toast) return; 
+      els.toast.textContent = msg; 
+      els.toast.classList.add('show'); 
+      setTimeout(() => els.toast.classList.remove('show'), dur); 
+    };
+
+    const renderDropdown = (data) => {
+      if (!els.dropdown) return; 
+      els.dropdown.innerHTML = '';
+      Object.entries(data).forEach(([code, lang]) => {
+        const opt = document.createElement('div'); 
+        opt.className = 'select-option'; 
+        opt.dataset.code = code; 
+        opt.textContent = lang.name;
+        opt.onclick = () => { selectLang(code); els.dropdown.classList.remove('open'); els.langSelect.classList.remove('open'); };
+        els.dropdown.appendChild(opt);
+      });
+    };
+
+    const applyLang = (code) => {
+      const data = config?.[code]; 
+      if (!data) return;
+      
+      document.querySelectorAll('[data-i18n]').forEach(el => { 
+        const k = el.dataset.i18n; 
+        if (data.ui?.[k]) el.textContent = data.ui[k]; 
+      });
+      
+      document.querySelectorAll('[data-i18n-title]').forEach(el => {
+        const k = el.dataset.i18nTitle;
+        if (data.ui?.[k]) el.title = data.ui[k];
+      });
+      
+      if (els.currentLang) els.currentLang.textContent = data.name;
+      if (els.badge) { els.badge.textContent = `${data.version || 'v1.0'} • ${data.name}`; els.badge.className = 'version-badge latest'; }
+      if (els.date) els.date.textContent = data.releaseDate || '—';
+      if (els.credits) els.credits.textContent = data.credits || '—';
+      if (els.ver) els.ver.textContent = data.version || 'v1.0';
+      if (els.note) els.note.textContent = data.note || '—';
+      if (data.ui?.pageTitle) document.title = data.ui.pageTitle;
+      
+      if (els.dropdown) els.dropdown.querySelectorAll('.select-option').forEach(o => o.classList.toggle('active', o.dataset.code === code));
+      loadGame(data);
+    };
+
+    const selectLang = (code) => { 
+      if (!config?.[code]) return; 
+      currentLang = code; 
+      localStorage.setItem('clover_lang', code); 
+      applyLang(code); 
+      showToast(config[code].ui?.langSwitched || 'Language changed'); 
+    };
+
+    // revealed/revealFrame/onGameMessage are declared once here — outside loadGame —
+    // so repeated calls to loadGame (language switches, refreshes) never stack up
+    // duplicate listeners or leave stale closures that block the reveal.
+    //
+    // The game's main.js sends postMessage({type:'flc_scene_ready'}) to window.parent
+    // once Scene_Title has rendered 6 frames, guaranteeing the animated background
+    // is on screen. gl.readPixels was unreliable because WebGL clears its drawing
+    // buffer after each composite (preserveDrawingBuffer defaults to false), so
+    // pixel sampling always returned black regardless of what was visually shown.
+
+    let revealed = false;
+
+    const revealFrame = () => {
+      if (revealed) return;
+      revealed = true;
+      if (loadTimeout) clearTimeout(loadTimeout);
+      if (!els.wrapper) return;
+      els.wrapper.classList.remove('loading');
+      if (els.spinner) els.spinner.style.display = 'none';
+      els.frame.style.transition = 'opacity 0.35s ease';
+      els.frame.style.opacity = '1';
+      els.frame.onload = null;
+    };
+
+    const onGameMessage = (e) => {
+      if (e.source !== els.frame.contentWindow) return;
+      if (e.data && e.data.type === 'flc_scene_ready') revealFrame();
+    };
+
+    window.addEventListener('message', onGameMessage);
+
+    const loadGame = (data) => {
+      if (!els.wrapper || !els.frame) return;
+      if (loadTimeout) clearTimeout(loadTimeout);
+
+      // Reset reveal state for the new load
+      revealed = false;
+
+      els.wrapper.classList.add('loading');
+      if (els.spinner) els.spinner.style.display = 'block';
+      els.frame.style.opacity = '0';
+      if (data?.gameUrl) els.frame.src = data.gameUrl;
+      if (els.downloadBtn && data?.downloadUrl) { els.downloadBtn.href = data.downloadUrl; els.downloadBtn.style.display = 'flex'; }
+      else if (els.downloadBtn) els.downloadBtn.style.display = 'none';
+
+      // Fallback: reveal after 25 s if postMessage never fires
+      loadTimeout = setTimeout(() => { if (!revealed) revealFrame(); }, 25000);
+    };
+
+    const unlockAudio = () => {
+      if (!els.audioOverlay || els.audioOverlay.classList.contains('hidden')) return;
+      try { const e = new Audio(); e.volume = 0; e.play().catch(()=>{}); } catch(e) {}
+      try {
+        const cw = els.frame.contentWindow;
+        if (cw) {
+          const AudioCtx = cw.AudioContext || cw.webkitAudioContext;
+          if (AudioCtx) {
+            const ctx = new AudioCtx();
+            const buffer = ctx.createBuffer(1, 1, 22050);
+            const source = ctx.createBufferSource();
+            source.buffer = buffer; source.connect(ctx.destination); source.start(0);
+            if (cw.WebAudio && cw.WebAudio._context) cw.WebAudio._context.resume();
+          }
+        }
+      } catch (e) { console.warn("Iframe audio unlock failed:", e); }
+      els.audioOverlay.classList.add('hidden');
+      setTimeout(() => { els.audioOverlay.style.display = 'none'; els.frame.focus(); }, 400);
+    };
+
+    function init() {
+      renderDropdown(config);
+      els.langSelect.onclick = () => { els.langSelect.classList.toggle('open'); els.dropdown.classList.toggle('open'); };
+      document.addEventListener('click', (e) => { 
+        if (!els.langSelect.contains(e.target) && !els.dropdown.contains(e.target)) { 
+          els.langSelect.classList.remove('open'); els.dropdown.classList.remove('open'); 
+        }
+      });
+      if (els.audioOverlay) {
+        els.audioOverlay.addEventListener('click', unlockAudio);
+        els.audioOverlay.addEventListener('touchstart', unlockAudio, { passive: true });
+      }
+      applyLang(currentLang);
+    }
+
+    if (els.frame) { 
+      $('#fullscreenBtn').onclick = () => { 
+        if (!document.fullscreenElement) els.frame.requestFullscreen?.() || els.frame.webkitRequestFullscreen?.();
+        else document.exitFullscreen?.() || document.webkitExitFullscreen?.();
+      };
+    }
+    
+    $('#hideUiBtn').onclick = () => {
+      uiVisible = !uiVisible;
+      const ui = config?.[currentLang]?.ui || {};
+      els.controls.classList.toggle('hidden', !uiVisible);
+      els.wrapper.classList.toggle('ui-hidden', !uiVisible);
+      showToast(uiVisible ? ui.uiVisible : ui.uiHidden);
+    };
+    
+    if(els.downloadBtn) els.downloadBtn.onclick = () => setTimeout(() => showToast(config?.[currentLang]?.ui?.downloadStarted), 300);
+    
+    document.addEventListener('keydown', (e) => {
+      if (e.target.matches('input, textarea, select')) return;
+      if (e.key.toLowerCase() === 'f') { e.preventDefault(); $('#fullscreenBtn')?.click(); }
+      if (e.key.toLowerCase() === 'h') { e.preventDefault(); $('#hideUiBtn')?.click(); }
+      if (e.key === 'Escape' && !uiVisible) $('#hideUiBtn')?.click();
+    });
+
+    // 🚀 Fetch JSON, Clean Spaces, and Handle ?lang= URL Parameters
+    fetch('./game-config.json?t=' + Date.now())
+      .then(r => r.json())
+      .then(data => {
+        config = cleanJSON(data);
+        
+        // 🎯 URL Routing Logic
+        const availableLangs = Object.keys(config);
+        const urlParams = new URLSearchParams(window.location.search);
+        const urlLang = urlParams.get('lang');
+        const savedLang = localStorage.getItem('clover_lang');
+        const browserLang = navigator.language.split('-')[0];
+
+        // Priority: URL Parameter > LocalStorage > Browser Language > First in JSON
+        if (urlLang && availableLangs.includes(urlLang)) {
+          currentLang = urlLang;
+          localStorage.setItem('clover_lang', currentLang); // Remember URL choice
+        } else if (savedLang && availableLangs.includes(savedLang)) {
+          currentLang = savedLang;
+        } else if (availableLangs.includes(browserLang)) {
+          currentLang = browserLang;
+        } else if (availableLangs.length > 0) {
+          currentLang = availableLangs[0];
+        }
+
+        init();
+      })
+      .catch(e => { console.error('Config load failed:', e); });
+  </script>
+</body>
+</html>
