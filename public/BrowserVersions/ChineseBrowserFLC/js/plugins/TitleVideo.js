@@ -162,8 +162,22 @@ SOFTWARE.
         var ext = Game_Interpreter.prototype.videoFileExt();
         var vidFilePath = 'movies/'+ filepath + ext;
 
-        if(DEBUG) console.log('Loading video as texture:', vidFilePath);
-        var vidTexture = PIXI.Texture.fromVideo(vidFilePath);
+        // Cache-bust the video URL so the browser never reuses a stale or
+        // partial cached response across refreshes, which caused the title
+        // screen background to go black after repeated page loads.
+        var vidFilePathBusted = vidFilePath + '?_t=' + Date.now();
+
+        // Also evict any previously cached PIXI texture for this video so
+        // PIXI doesn't hand back the old broken texture on refresh.
+        if (PIXI.utils.TextureCache[vidFilePath]) {
+            delete PIXI.utils.TextureCache[vidFilePath];
+        }
+        if (PIXI.utils.TextureCache[vidFilePathBusted]) {
+            delete PIXI.utils.TextureCache[vidFilePathBusted];
+        }
+
+        if(DEBUG) console.log('Loading video as texture:', vidFilePathBusted);
+        var vidTexture = PIXI.Texture.fromVideo(vidFilePathBusted);
 
         vid = vidTexture.baseTexture.source;
         vidSprite = new PIXI.Sprite(vidTexture);
