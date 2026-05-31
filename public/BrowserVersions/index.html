@@ -21,6 +21,7 @@
       --gap-controls: 10px; --pad-controls: 12px 20px; --size-btn: 44px;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
+    html, body { overscroll-behavior: none; }
     body { font-family: var(--font); background: var(--bg-primary); color: var(--text-primary); display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 100vh; padding: 24px; line-height: 1.5; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
     body::before { content: ''; position: fixed; inset: 0; background: radial-gradient(circle at 20% 80%,rgba(46,204,113,.03) 0%,transparent 20%),radial-gradient(circle at 80% 20%,rgba(46,204,113,.02) 0%,transparent 25%); pointer-events: none; z-index: -1; }
     .top-bar { width: 100%; max-width: 1200px; margin-bottom: 16px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
@@ -122,6 +123,13 @@
   <div class="toast" id="toast">—</div>
 
   <script>
+    // Prevent page scrolling on touch devices while keeping dropdown scrollable
+    document.addEventListener('touchmove', function(e) {
+      var dropdown = document.getElementById('langDropdown');
+      if (dropdown && dropdown.contains(e.target)) return;
+      e.preventDefault();
+    }, { passive: false });
+
     const $ = (sel) => document.querySelector(sel);
     const els = {
       langSelect: $('#langSelector'), dropdown: $('#langDropdown'), currentLang: $('#currentLangText'),
