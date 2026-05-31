@@ -21,8 +21,8 @@
       --gap-controls: 10px; --pad-controls: 12px 20px; --size-btn: 44px;
     }
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    html { overflow: hidden; position: fixed; width: 100%; height: 100%; overscroll-behavior: none; }
-    body { font-family: var(--font); background: var(--bg-primary); color: var(--text-primary); display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 100vh; padding: 24px; line-height: 1.5; touch-action: manipulation; -webkit-tap-highlight-color: transparent; overflow-y: auto; overflow-x: hidden; overscroll-behavior: none; width: 100%; }
+    html, body { overscroll-behavior: none; }
+    body { font-family: var(--font); background: var(--bg-primary); color: var(--text-primary); display: flex; flex-direction: column; justify-content: center; align-items: center; min-height: 100vh; padding: 24px; line-height: 1.5; touch-action: manipulation; -webkit-tap-highlight-color: transparent; }
     body::before { content: ''; position: fixed; inset: 0; background: radial-gradient(circle at 20% 80%,rgba(46,204,113,.03) 0%,transparent 20%),radial-gradient(circle at 80% 20%,rgba(46,204,113,.02) 0%,transparent 25%); pointer-events: none; z-index: -1; }
     .top-bar { width: 100%; max-width: 1200px; margin-bottom: 16px; display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
     .selector-group { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 200px; }
@@ -123,12 +123,13 @@
   <div class="toast" id="toast">—</div>
 
   <script>
-    // Prevent page scrolling on touch devices while keeping dropdown scrollable
-    document.addEventListener('touchmove', function(e) {
-      var dropdown = document.getElementById('langDropdown');
-      if (dropdown && dropdown.contains(e.target)) return;
-      e.preventDefault();
-    }, { passive: false });
+    // Prevent scrolling only when touching the game wrapper area
+    var gameWrapper = document.getElementById('gameWrapper');
+    if (gameWrapper) {
+      gameWrapper.addEventListener('touchmove', function(e) {
+        e.preventDefault();
+      }, { passive: false });
+    }
 
     const $ = (sel) => document.querySelector(sel);
     const els = {
