@@ -64,9 +64,6 @@
     .info-value.note { grid-column: 1/-1; margin-top: 4px; line-height: 1.6; white-space: pre-line; }
     .toast { position: fixed; bottom: 32px; left: 50%; transform: translateX(-50%) translateY(100px); background: var(--bg-controls); color: var(--text-primary); padding: 14px 28px; border-radius: 14px; font-size: 14px; z-index: 2000; transition: var(--trans-smooth); box-shadow: var(--shadow-game); border: 1px solid var(--border-color); backdrop-filter: blur(12px); opacity: 0; }
     .toast.show { transform: translateX(-50%) translateY(0); opacity: 1; }
-    .game-wrapper.loading #gameFrame { opacity: 0; }
-    .loading-spinner { position: absolute; top: 50%; left: 50%; transform: translate(-50%,-50%); width: 48px; height: 48px; border: 4px solid var(--border-color); border-top-color: var(--accent); border-radius: 50%; animation: spin 1s linear infinite; z-index: 10; pointer-events: none; display: block; }
-    .game-wrapper:not(.loading) .loading-spinner { display: none!important; }
     @keyframes spin { to { transform: translate(-50%,-50%) rotate(360deg); } }
     @media (max-width: 768px) { 
       :root { --size-btn: 40px; --pad-controls: 10px 16px; --radius-controls: 32px; --radius-game: 16px; } 
@@ -99,7 +96,6 @@
   </div>
   
   <div class="game-wrapper" id="gameWrapper">
-    <div class="loading-spinner" id="loadingSpinner"></div>
     <iframe id="gameFrame" src="" allow="autoplay; fullscreen; gamepad" loading="lazy" title="Four Leaf Clover Game" tabindex="0"></iframe>
     
     <div class="audio-overlay" id="audioOverlay">
@@ -129,13 +125,13 @@
     const $ = (sel) => document.querySelector(sel);
     const els = {
       langSelect: $('#langSelector'), dropdown: $('#langDropdown'), currentLang: $('#currentLangText'),
-      badge: $('#versionBadge'), wrapper: $('#gameWrapper'), spinner: $('#loadingSpinner'), frame: $('#gameFrame'),
+      badge: $('#versionBadge'), wrapper: $('#gameWrapper'), frame: $('#gameFrame'),
       controls: $('#gameControls'), toast: $('#toast'), date: $('#infoDate'), credits: $('#infoCredits'),
       ver: $('#infoVersion'), note: $('#infoNote'), downloadBtn: $('#downloadBtn'), audioOverlay: $('#audioOverlay')
     };
     
     let currentLang = 'zh'; // Default, will be overridden by URL/JSON logic
-    let uiVisible = true, idleTimer = null, loadTimeout = null;
+    let uiVisible = true, idleTimer = null;
     let config = {};
 
     // 🪄 MAGIC FIX: Automatically strips all trailing/leading spaces from JSON keys and values
@@ -204,53 +200,12 @@
       showToast(config[code].ui?.langSwitched || 'Language changed'); 
     };
 
-    // revealed/revealFrame/onGameMessage are declared once here — outside loadGame —
-    // so repeated calls to loadGame (language switches, refreshes) never stack up
-    // duplicate listeners or leave stale closures that block the reveal.
-    //
-    // The game's main.js sends postMessage({type:'flc_scene_ready'}) to window.parent
-    // once Scene_Title has rendered 6 frames, guaranteeing the animated background
-    // is on screen. gl.readPixels was unreliable because WebGL clears its drawing
-    // buffer after each composite (preserveDrawingBuffer defaults to false), so
-    // pixel sampling always returned black regardless of what was visually shown.
-
-    let revealed = false;
-
-    const revealFrame = () => {
-      if (revealed) return;
-      revealed = true;
-      if (loadTimeout) clearTimeout(loadTimeout);
-      if (!els.wrapper) return;
-      els.wrapper.classList.remove('loading');
-      if (els.spinner) els.spinner.style.display = 'none';
-      els.frame.style.transition = 'opacity 0.35s ease';
-      els.frame.style.opacity = '1';
-      els.frame.onload = null;
-    };
-
-    const onGameMessage = (e) => {
-      if (e.source !== els.frame.contentWindow) return;
-      if (e.data && e.data.type === 'flc_scene_ready') revealFrame();
-    };
-
-    window.addEventListener('message', onGameMessage);
-
     const loadGame = (data) => {
       if (!els.wrapper || !els.frame) return;
-      if (loadTimeout) clearTimeout(loadTimeout);
-
-      // Reset reveal state for the new load
-      revealed = false;
-
-      els.wrapper.classList.add('loading');
-      if (els.spinner) els.spinner.style.display = 'block';
-      els.frame.style.opacity = '0';
       if (data?.gameUrl) els.frame.src = data.gameUrl;
+      els.frame.style.opacity = '1';
       if (els.downloadBtn && data?.downloadUrl) { els.downloadBtn.href = data.downloadUrl; els.downloadBtn.style.display = 'flex'; }
       else if (els.downloadBtn) els.downloadBtn.style.display = 'none';
-
-      // Fallback: reveal after 25 s if postMessage never fires
-      loadTimeout = setTimeout(() => { if (!revealed) revealFrame(); }, 25000);
     };
 
     const unlockAudio = () => {
