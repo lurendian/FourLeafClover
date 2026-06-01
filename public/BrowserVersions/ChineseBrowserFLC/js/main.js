@@ -306,3 +306,11 @@ window.onload = function() {
     };
 
 })();
+
+// DEBUG: Console logging for audio preloader
+window.addEventListener('message', function(e) {
+    if (e.data && e.data.type === 'flc_audio_progress') {
+        console.log('🎵 Audio Progress:', e.data.loaded + '/' + e.data.total, 
+                   '| Unlocked:', e.data.unlocked);
+    }
+});
