@@ -5,19 +5,11 @@
 PluginManager.setup($plugins);
 
 //=============================================================================
-// Audio Preloader
-//
-// Pre-fetches and decodes the most critical audio files immediately on boot
-// before RPG Maker requests them, so playback is instant when needed.
-// Also hooks AudioManager.createBuffer to preload any file the moment RPG
-// Maker first requests it, caching the decoded buffer for instant reuse.
-// Reports progress to the parent page via postMessage.
+// Audio Preloader - MOBILE-FIXED VERSION
 //=============================================================================
 (function() {
     'use strict';
 
-    // Critical files known from System.json — fetched immediately on boot
-    // before the game engine even starts, eliminating the first-play delay.
     var CRITICAL_BGM = ['MainTitle','Battle3','Ship1','Ship2','Ship3'];
     var CRITICAL_ME  = ['Victory1','Defeat1','Gameover2'];
     var CRITICAL_SE  = ['Cursor2','Decision1','Cancel2','Buzzer1','Equip1',
@@ -26,23 +18,51 @@ PluginManager.setup($plugins);
                         'Recovery','Miss','Evasion1','Evasion2','Reflection',
                         'Shop1','Item3'];
 
-    var _ctx       = null;
-    var _cache     = {}; // path -> decoded AudioBuffer
-    var _fetching  = {}; // path -> true (in-flight)
-    var _total     = 0;
-    var _loaded    = 0;
+    var _ctx = null;
+    var _cache = {};
+    var _fetching = {};
+    var _total = 0;
+    var _loaded = 0;
+    var _audioUnlocked = false;
 
     function getCtx() {
         if (_ctx) return _ctx;
         var AC = window.AudioContext || window.webkitAudioContext;
         if (!AC) return null;
-        try { _ctx = new AC(); } catch(e) {}
+        try { 
+            _ctx = new AC(); 
+            if (_ctx.state === 'suspended') {
+                _ctx.resume().catch(function(){});
+            }
+        } catch(e) {}
         return _ctx;
     }
 
+    function unlockAudio() {
+        if (_audioUnlocked) return;
+        var ctx = getCtx();
+        if (ctx && ctx.state === 'suspended') {
+            ctx.resume().then(function() {
+                _audioUnlocked = true;
+                startPreloading();
+            }).catch(function(){});
+        } else if (ctx) {
+            _audioUnlocked = true;
+            startPreloading();
+        }
+        document.removeEventListener('touchstart', unlockAudio);
+        document.removeEventListener('mousedown', unlockAudio);
+        document.removeEventListener('keydown', unlockAudio);
+    }
+
+    // Attach unlock listeners immediately
+    document.addEventListener('touchstart', unlockAudio, {once: true, passive: true});
+    document.addEventListener('mousedown', unlockAudio, {once: true});
+    document.addEventListener('keydown', unlockAudio, {once: true});
+
     function getExt() {
         var a = document.createElement('audio');
-        return a.canPlayType('audio/ogg') ? '.rpgmvo' : '.rpgmvm';
+        return a.canPlayType('audio/ogg; codecs="vorbis"') ? '.rpgmvo' : '.rpgmvm';
     }
 
     function sendProgress() {
@@ -51,7 +71,8 @@ PluginManager.setup($plugins);
                 window.parent.postMessage({
                     type: 'flc_audio_progress',
                     loaded: _loaded,
-                    total: _total
+                    total: _total,
+                    unlocked: _audioUnlocked
                 }, '*');
             }
         } catch(e) {}
@@ -59,6 +80,18 @@ PluginManager.setup($plugins);
 
     function preload(path) {
         if (_cache[path] || _fetching[path]) return;
+        
+        var ctx = getCtx();
+        if (!ctx || (ctx.state !== 'running' && !_audioUnlocked)) {
+            if (!_fetching[path]) {
+                _fetching[path] = 'pending';
+                _total++;
+                sendProgress();
+            }
+            return;
+        }
+        
+        if (_fetching[path] === true) return;
         _fetching[path] = true;
         _total++;
         sendProgress();
@@ -67,30 +100,56 @@ PluginManager.setup($plugins);
         xhr.open('GET', path, true);
         xhr.responseType = 'arraybuffer';
         xhr.onload = function() {
-            if (xhr.status !== 200) { _loaded++; sendProgress(); return; }
-            var ctx = getCtx();
-            if (!ctx) { _loaded++; sendProgress(); return; }
-            ctx.decodeAudioData(xhr.response,
-                function(buf) { _cache[path] = buf; _loaded++; sendProgress(); },
-                function()    {                      _loaded++; sendProgress(); }
+            if (xhr.status !== 200) { cleanup(); return; }
+            var context = getCtx();
+            if (!context) { cleanup(); return; }
+            
+            context.decodeAudioData(xhr.response,
+                function(buf) { 
+                    _cache[path] = buf; 
+                    _loaded++; 
+                    sendProgress(); 
+                },
+                function(err) { 
+                    console.warn('Decode failed for ' + path, err);
+                    cleanup(); 
+                }
             );
         };
-        xhr.onerror = function() { _loaded++; sendProgress(); };
-        try { xhr.send(); } catch(e) { _loaded++; sendProgress(); }
+        xhr.onerror = function() { cleanup(); };
+        xhr.ontimeout = function() { cleanup(); };
+        xhr.timeout = 10000;
+        
+        try { 
+            xhr.send(); 
+        } catch(e) { 
+            cleanup(); 
+        }
+        
+        function cleanup() {
+            _loaded++;
+            sendProgress();
+        }
     }
 
     function preloadList(folder, names, ext) {
-        names.forEach(function(n) { if (n) preload(folder + '/' + n + ext); });
+        names.forEach(function(n) { 
+            if (n) preload(folder + '/' + n + ext); 
+        });
     }
 
-    // Start fetching critical files immediately
-    var ext = getExt();
-    preloadList('audio/bgm', CRITICAL_BGM, ext);
-    preloadList('audio/me',  CRITICAL_ME,  ext);
-    preloadList('audio/se',  CRITICAL_SE,  ext);
+    function startPreloading() {
+        var ext = getExt();
+        preloadList('audio/bgm', CRITICAL_BGM, ext);
+        preloadList('audio/me',  CRITICAL_ME,  ext);
+        preloadList('audio/se',  CRITICAL_SE,  ext);
+    }
+    
+    var ctx = getCtx();
+    if (ctx && ctx.state === 'running') {
+        startPreloading();
+    }
 
-    // Hook AudioManager.createBuffer so every file RPG Maker loads for the
-    // first time gets pre-fetched and cached for instant subsequent plays.
     var _hookInstalled = false;
     var _hookInterval = setInterval(function() {
         if (typeof AudioManager === 'undefined') return;
@@ -100,24 +159,37 @@ PluginManager.setup($plugins);
 
         var _origCreate = AudioManager.createBuffer;
         AudioManager.createBuffer = function(folder, name) {
-            if (name) preload(folder + '/' + name + getExt());
+            if (name) {
+                var path = folder + '/' + name + getExt();
+                if (_audioUnlocked || (getCtx() && getCtx().state === 'running')) {
+                    preload(path);
+                }
+            }
             return _origCreate.apply(this, arguments);
         };
 
-        // Patch WebAudio to hand back our cached buffer when available,
-        // skipping the XHR+decode step RPG Maker would otherwise do.
         if (typeof WebAudio !== 'undefined' && WebAudio.prototype) {
             var _origLoad = WebAudio.prototype._load;
             if (_origLoad) {
                 WebAudio.prototype._load = function(url) {
-                    var cached = _cache[url];
+                    var lookupUrl = url;
+                    if (url.indexOf('://') === -1 && url[0] !== '/') {
+                        lookupUrl = url;
+                    }
+                    
+                    var cached = _cache[lookupUrl] || _cache[url.replace(/^\.\//, '')];
+                    
                     if (cached && this._context) {
                         try {
                             this._buffer = cached;
                             this._totalTime = cached.duration;
-                            this._onLoad();
-                            return;
-                        } catch(e) {}
+                            if (typeof this._onLoad === 'function') {
+                                this._onLoad();
+                            }
+                            return true;
+                        } catch(e) {
+                            console.warn('Cache playback failed', e);
+                        }
                     }
                     return _origLoad.apply(this, arguments);
                 };
