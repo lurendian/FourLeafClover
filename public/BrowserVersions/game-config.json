@@ -28,7 +28,7 @@
       "errorInvalidPage": "错误：页面结构无效。",
       "errorLoadGame": "游戏加载失败，请检查链接。",
       "loadingTimeout": "加载超时",
-      "audioUnlocked": "音频已解锁"
+      "audioUnlocked": "音频已解锁",
 	  "warningTitle": "音频加载中...",
 	  "warningText": "请等待几秒钟，让主菜单音乐开始播放，然后再点击“新游戏”，以确保获得最佳音频体验。",
 	  "dontShowAgain": "不再显示此提示",
