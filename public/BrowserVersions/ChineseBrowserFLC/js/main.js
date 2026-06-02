@@ -108,3 +108,11 @@ window.onload = function() {
     };
 
 })();
+
+// Force RPG Maker to only use .m4a files (Allows you to delete .ogg files to save space)
+var _forceM4A = setInterval(function() {
+    if (typeof AudioManager !== 'undefined') {
+        clearInterval(_forceM4A);
+        AudioManager.canPlayOgg = function() { return false; };
+    }
+}, 100);
