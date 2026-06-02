@@ -112,7 +112,7 @@ window.onload = function() {
 (function() {
     var _audioUnlocked = false;
 
-    // 1. AUDIO UNLOCK (Satisfies mobile browser gesture requirements)
+    // 1. AUDIO UNLOCK
     function unlockAudio() {
         if (_audioUnlocked) return;
         var AC = window.AudioContext || window.webkitAudioContext;
@@ -133,12 +133,12 @@ window.onload = function() {
         if (e.data && e.data.type === 'flc_unlock_audio') unlockAudio();
     });
 
-    // 2. WAIT FOR RPG MAKER TO BOOT, THEN APPLY ALL FIXES
+    // 2. WAIT FOR RPG MAKER TO BOOT
     var _masterInit = setInterval(function() {
         if (typeof AudioManager !== 'undefined') {
             clearInterval(_masterInit);
 
-            // --- A. NUCLEAR OPTION: Force .m4a and Kill Encryption Flags ---
+            // --- A. NUCLEAR OPTION: Force .m4a and Kill Encryption ---
             AudioManager.audioFileExt = function() { return ".m4a"; };
             AudioManager._canPlayOgg = false;
             AudioManager._canPlayM4a = true;
@@ -151,37 +151,38 @@ window.onload = function() {
                 WebAudio._extension = ".m4a";
             }
 
-            // --- B. SILVER BULLET: Force HTML5 Audio Streaming ---
-            AudioManager.shouldUseHtml5Audio = function() { return true; };
-            AudioManager._shouldUseHtml5 = true; 
+            // --- B. SMART AUDIO ROUTING (Fixes Desktop Private Browsers) ---
+            // Detect if the user is on a touch device (Mobile/Tablet)
+            var isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
 
-            // --- C. SAFE AUTOPLAY CATCHER (Fixes Edge/Brave Private Modes) ---
-            // InPrivate modes block auto-play until a click happens INSIDE the game.
-            // Instead of breaking RPG Maker's internal code, we just listen for clicks.
-            // If the browser blocked the music, this forces it to resume on the first click.
-            var _safeUnlock = function() {
-                // 1. Resume HTML5 Audio (BGM/BGS) if it was blocked
-                if (typeof Html5Audio !== 'undefined' && Html5Audio._audioElement) {
-                    if (Html5Audio._audioElement.paused && Html5Audio._playing) {
-                        Html5Audio._audioElement.play().catch(function(){});
+            if (isTouchDevice) {
+                // 📱 MOBILE: Force HTML5 Audio to stream (prevents 15s delay)
+                AudioManager.shouldUseHtml5Audio = function() { return true; };
+                AudioManager._shouldUseHtml5 = true; 
+                
+                // Safety net: Catch autoplay blocks directly on the Canvas element
+                var resumeHtml5 = function() {
+                    if (typeof Html5Audio !== 'undefined' && Html5Audio._audioElement) {
+                        if (Html5Audio._audioElement.paused) {
+                            Html5Audio._audioElement.play().catch(function(){});
+                        }
                     }
+                };
+                var canvas = document.querySelector('canvas');
+                if (canvas) {
+                    canvas.addEventListener('touchstart', resumeHtml5, {once: true, passive: true});
+                    canvas.addEventListener('mousedown', resumeHtml5, {once: true});
                 }
-                // 2. Resume Web Audio API (SE/ME) context if suspended
-                if (typeof WebAudio !== 'undefined' && WebAudio._context) {
-                    if (WebAudio._context.state === 'suspended') {
-                        WebAudio._context.resume().catch(function(){});
-                    }
-                }
-            };
+            } else {
+                // 💻 DESKTOP: Use Web Audio API. 
+                // It's already unlocked by your wrapper page and bypasses <audio> blocks!
+                AudioManager.shouldUseHtml5Audio = function() { return false; };
+                AudioManager._shouldUseHtml5 = false;
+            }
 
-            // Attach to clicks and touches inside the iframe
-            document.addEventListener('click', _safeUnlock, true);
-            document.addEventListener('touchstart', _safeUnlock, true);
-            document.addEventListener('keydown', _safeUnlock, true);
-
-            // --- D. XHR CACHE WARMER (Backup for Mobile WebAudio fallback) ---
+            // --- C. XHR CACHE WARMER ---
             // 👇 PASTE YOUR PYTHON SCRIPT OUTPUT INSIDE THESE BRACKETS 👇
-            var FILES_TO_PRELOAD = [
+var FILES_TO_PRELOAD = [
     'bgm/MainTitle', 'bgm/Sword', 'bgm/Sword1', 'bgm/Sword2', 'bgm/antique',
     'bgm/alonetime', 'bgm/Ship1', 'bgm/Ship2', 'bgm/Ship3', 'bgm/Battle3',
     'bgm/fenghuang', 'bgm/forest', 'bgm/forest2', 'bgm/fuzai', 'bgm/havewemet',
@@ -250,7 +251,6 @@ window.onload = function() {
     'se/suck2', 'se/taotaotun', 'se/tiger', 'se/tiger2', 'se/trainSE',
     'se/water', 'se/wine', 'se/wirte',
 ];
-
             var ext = '.m4a'; 
 
             setTimeout(function() {
@@ -260,10 +260,9 @@ window.onload = function() {
                     xhr.responseType = 'arraybuffer';
                     xhr.send(); 
                 });
-                console.log("🔥 Cache warmer started for " + FILES_TO_PRELOAD.length + " files");
             }, 2000);
 
-            console.log("🔊 MASTER FIX v3 APPLIED: Safe Autoplay Catcher Active.");
+            console.log("🔊 MASTER FIX v4 APPLIED: Smart Routing Active.");
         }
     }, 100); 
 })();
