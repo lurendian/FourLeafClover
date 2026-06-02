@@ -125,12 +125,10 @@ window.onload = function() {
         _audioUnlocked = true;
     }
 
-    // Listen for local screen taps/clicks
     document.addEventListener('touchstart', unlockAudio, {once: true, passive: true});
     document.addEventListener('mousedown', unlockAudio, {once: true});
     document.addEventListener('keydown', unlockAudio, {once: true});
 
-    // Listen for the "Unlock" signal from your wrapper page (index.html)
     window.addEventListener('message', function(e) {
         if (e.data && e.data.type === 'flc_unlock_audio') unlockAudio();
     });
@@ -154,12 +152,34 @@ window.onload = function() {
             }
 
             // --- B. SILVER BULLET: Force HTML5 Audio Streaming ---
-            // This forces the browser to use the native <audio> tag, which streams
-            // instantly on mobile instead of waiting to download the whole file into RAM.
             AudioManager.shouldUseHtml5Audio = function() { return true; };
             AudioManager._shouldUseHtml5 = true; 
 
-            // --- C. XHR CACHE WARMER (Backup for WebAudio fallback) ---
+            // --- C. SAFE AUTOPLAY CATCHER (Fixes Edge/Brave Private Modes) ---
+            // InPrivate modes block auto-play until a click happens INSIDE the game.
+            // Instead of breaking RPG Maker's internal code, we just listen for clicks.
+            // If the browser blocked the music, this forces it to resume on the first click.
+            var _safeUnlock = function() {
+                // 1. Resume HTML5 Audio (BGM/BGS) if it was blocked
+                if (typeof Html5Audio !== 'undefined' && Html5Audio._audioElement) {
+                    if (Html5Audio._audioElement.paused && Html5Audio._playing) {
+                        Html5Audio._audioElement.play().catch(function(){});
+                    }
+                }
+                // 2. Resume Web Audio API (SE/ME) context if suspended
+                if (typeof WebAudio !== 'undefined' && WebAudio._context) {
+                    if (WebAudio._context.state === 'suspended') {
+                        WebAudio._context.resume().catch(function(){});
+                    }
+                }
+            };
+
+            // Attach to clicks and touches inside the iframe
+            document.addEventListener('click', _safeUnlock, true);
+            document.addEventListener('touchstart', _safeUnlock, true);
+            document.addEventListener('keydown', _safeUnlock, true);
+
+            // --- D. XHR CACHE WARMER (Backup for Mobile WebAudio fallback) ---
             // 👇 PASTE YOUR PYTHON SCRIPT OUTPUT INSIDE THESE BRACKETS 👇
             var FILES_TO_PRELOAD = [
     'bgm/MainTitle', 'bgm/Sword', 'bgm/Sword1', 'bgm/Sword2', 'bgm/antique',
@@ -233,7 +253,6 @@ window.onload = function() {
 
             var ext = '.m4a'; 
 
-            // Start downloading 2 seconds after boot (while user is on Title Screen)
             setTimeout(function() {
                 FILES_TO_PRELOAD.forEach(function(file) {
                     var xhr = new XMLHttpRequest();
@@ -244,7 +263,7 @@ window.onload = function() {
                 console.log("🔥 Cache warmer started for " + FILES_TO_PRELOAD.length + " files");
             }, 2000);
 
-            console.log("🔊 MASTER FIX APPLIED: .m4a forced, HTML5 streaming enabled.");
+            console.log("🔊 MASTER FIX v3 APPLIED: Safe Autoplay Catcher Active.");
         }
     }, 100); 
 })();
