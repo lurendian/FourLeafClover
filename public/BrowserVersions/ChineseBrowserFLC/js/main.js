@@ -266,79 +266,82 @@ var FILES_TO_PRELOAD = [
         }
     }, 100); 
 })();
-
 //=============================================================================
-// Bulletproof Mobile Touch: Custom Long-Press & 2-Finger Tap Fix
+// Bulletproof Mobile Touch: Capture-Phase Interceptor
 //=============================================================================
 (function() {
-    var _check = setInterval(function() {
-        if (typeof TouchInput !== 'undefined' && typeof SceneManager !== 'undefined') {
-            clearInterval(_check);
-            
-            var isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
-            if (!isTouchDevice) return;
+    var isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+    if (!isTouchDevice) return;
 
-            // Helper: Simulate Escape Key & Wipe Movement Queue
-            function simulateEscape() {
-                var options = { key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true, cancelable: true };
-                document.dispatchEvent(new KeyboardEvent('keydown', options));
-                setTimeout(function() {
-                    document.dispatchEvent(new KeyboardEvent('keyup', options));
-                }, 100);
-                
-                // Force clear TouchInput state to prevent the "Ghost Step"
-                if (typeof TouchInput !== 'undefined') TouchInput.clear();
-            }
+    var longPressTimer = null;
+    var longPressTriggered = false;
+    var startX = 0, startY = 0;
 
-            var _longPressTimer = null;
-            var _isLongPressing = false;
+    function simulateEscape() {
+        var options = { key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true, cancelable: true };
+        document.dispatchEvent(new KeyboardEvent('keydown', options));
+        setTimeout(function() {
+            document.dispatchEvent(new KeyboardEvent('keyup', options));
+        }, 50);
+    }
 
-            // 1. Intercept Touch Start
-            var _origTouchStart = TouchInput._onTouchStart.bind(TouchInput);
-            TouchInput._onTouchStart = function(event) {
-                // Detect 2-Finger Tap
-                if (event.touches.length >= 2) {
-                    event.preventDefault();
-                    this.clear(); // 🛑 Wipe any movement from the first finger
-                    simulateEscape(); // ✅ Open Menu / Cancel
-                    _isLongPressing = false;
-                    clearTimeout(_longPressTimer);
-                    return;
-                }
-
-                // Single Finger: Run original logic safely
-                _origTouchStart(event);
-
-                // Start Custom Long-Press Timer (600ms)
-                clearTimeout(_longPressTimer);
-                _isLongPressing = false;
-                _longPressTimer = setTimeout(function() {
-                    _isLongPressing = true;
-                    TouchInput.clear(); // 🛑 Stop movement
-                    simulateEscape(); // ✅ Open Menu / Cancel
-                }, 600);
-            };
-
-            // 2. Intercept Touch Move (Cancel long-press if they drag to walk)
-            var _origTouchMove = TouchInput._onTouchMove.bind(TouchInput);
-            TouchInput._onTouchMove = function(event) {
-                clearTimeout(_longPressTimer); // If they move, it's a walk, not a menu tap
-                _origTouchMove(event);
-            };
-
-            // 3. Intercept Touch End (Block click if it was a long press)
-            var _origTouchEnd = TouchInput._onTouchEnd.bind(TouchInput);
-            TouchInput._onTouchEnd = function(event) {
-                clearTimeout(_longPressTimer);
-                if (_isLongPressing) {
-                    this.clear(); // Prevent the "release" from triggering a step
-                    _isLongPressing = false;
-                    return; 
-                }
-                _origTouchEnd(event);
-            };
-
-            console.log("📱 Bulletproof 2-Finger & Long-Press Patch Active.");
+    function clearRpgTouch() {
+        if (typeof TouchInput !== 'undefined') {
+            TouchInput.clear();
+            // Force reset internal states to prevent ghost steps
+            if (TouchInput._mousePressed !== undefined) TouchInput._mousePressed = 0;
+            if (TouchInput._screenPressed !== undefined) TouchInput._screenPressed = false;
+            if (TouchInput._pressedTime !== undefined) TouchInput._pressedTime = 0;
         }
-    }, 500);
+    }
+
+    // 1. Intercept Touch Start (Capture Phase - happens BEFORE RPG Maker sees it)
+    document.addEventListener('touchstart', function(e) {
+        if (e.touches.length >= 2) {
+            // 🛑 2-Finger Tap Detected!
+            e.preventDefault();
+            e.stopImmediatePropagation(); // Blocks RPG Maker from seeing this touch
+            clearRpgTouch();
+            simulateEscape();
+            clearTimeout(longPressTimer);
+            longPressTriggered = false;
+            return;
+        }
+
+        // 👇 Single Finger: Start Long-Press Timer
+        startX = e.touches[0].clientX;
+        startY = e.touches[0].clientY;
+        longPressTriggered = false;
+        
+        clearTimeout(longPressTimer);
+        longPressTimer = setTimeout(function() {
+            longPressTriggered = true;
+            clearRpgTouch();
+            simulateEscape();
+        }, 600); // 0.6 seconds
+    }, { capture: true, passive: false });
+
+    // 2. Intercept Touch Move (Cancel long-press if dragging to walk)
+    document.addEventListener('touchmove', function(e) {
+        if (e.touches.length === 1) {
+            var dx = e.touches[0].clientX - startX;
+            var dy = e.touches[0].clientY - startY;
+            if (Math.sqrt(dx*dx + dy*dy) > 15) {
+                clearTimeout(longPressTimer);
+            }
+        }
+    }, { capture: true, passive: true });
+
+    // 3. Intercept Touch End (Block click if it was a long press)
+    document.addEventListener('touchend', function(e) {
+        clearTimeout(longPressTimer);
+        if (longPressTriggered) {
+            e.preventDefault();
+            e.stopImmediatePropagation(); // Blocks RPG Maker from registering a "click"
+            clearRpgTouch();
+            longPressTriggered = false;
+        }
+    }, { capture: true, passive: false });
+
+    console.log("📱 Capture-Phase Touch Interceptor Active.");
 })();
