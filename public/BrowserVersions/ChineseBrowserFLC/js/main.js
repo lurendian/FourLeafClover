@@ -162,7 +162,6 @@ window.onload = function() {
             // --- C. XHR CACHE WARMER (Backup for WebAudio fallback) ---
             // 👇 PASTE YOUR PYTHON SCRIPT OUTPUT INSIDE THESE BRACKETS 👇
             var FILES_TO_PRELOAD = [
-                var FILES_TO_PRELOAD = [
     'bgm/MainTitle', 'bgm/Sword', 'bgm/Sword1', 'bgm/Sword2', 'bgm/antique',
     'bgm/alonetime', 'bgm/Ship1', 'bgm/Ship2', 'bgm/Ship3', 'bgm/Battle3',
     'bgm/fenghuang', 'bgm/forest', 'bgm/forest2', 'bgm/fuzai', 'bgm/havewemet',
