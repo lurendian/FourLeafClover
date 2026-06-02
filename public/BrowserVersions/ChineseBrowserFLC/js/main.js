@@ -109,10 +109,31 @@ window.onload = function() {
 
 })();
 
-// Force RPG Maker to only use .m4a files (Allows you to delete .ogg files to save space)
-var _forceM4A = setInterval(function() {
-    if (typeof AudioManager !== 'undefined') {
-        clearInterval(_forceM4A);
-        AudioManager.canPlayOgg = function() { return false; };
-    }
-}, 100);
+(function() {
+    // Check every 10ms to beat the engine's initialization
+    var _forceExt = setInterval(function() {
+        if (typeof AudioManager !== 'undefined') {
+            clearInterval(_forceExt);
+            
+            // 1. Hijack the exact function that returns the extension string
+            AudioManager.audioFileExt = function() { return ".m4a"; };
+            
+            // 2. Overwrite the internal cached booleans
+            AudioManager._canPlayOgg = false;
+            AudioManager._canPlayM4a = true;
+            
+            // 3. Kill the Decrypter if it exists (Stops .rpgmvo/.rpgmvm requests)
+            if (typeof Decrypter !== 'undefined') {
+                Decrypter.hasEncryptedAudio = false;
+                Decrypter.hasEncryptedImages = false;
+            }
+            
+            // 4. MZ Compatibility (just in case you are using MZ)
+            if (typeof WebAudio !== 'undefined' && WebAudio._extension !== undefined) {
+                WebAudio._extension = ".m4a";
+            }
+            
+            console.log("🔊 FORCED AUDIO EXTENSION TO: .m4a");
+        }
+    }, 10); 
+})();
