@@ -4,127 +4,6 @@
 
 PluginManager.setup($plugins);
 
-//=============================================================================
-// Mobile Audio Fix - RPG Maker Native Approach
-//=============================================================================
-(function() {
-    'use strict';
-
-    // Critical sounds to preload (RPG Maker will handle decryption)
-    var CRITICAL_BGM = ['MainTitle','Battle3','Ship1','Ship2','Ship3'];
-    var CRITICAL_ME  = ['Victory1','Defeat1','Gameover2'];
-    var CRITICAL_SE  = ['Cursor2','Decision1','Cancel2','Buzzer1','Equip1',
-                        'Save','Load','Battle1','Run','Attack3','Damage4',
-                        'Collapse1','Collapse2','Collapse3','Damage5',
-                        'Recovery','Miss','Evasion1','Evasion2','Reflection',
-                        'Shop1','Item3'];
-
-    var _audioUnlocked = false;
-    var _preloadQueue = [];
-
-    // Unlock audio on first user gesture (required for mobile)
-    function unlockAudio() {
-        if (_audioUnlocked) return;
-        
-        // Resume AudioContext if it exists
-        var ctx = window.AudioContext && (new (window.AudioContext || window.webkitAudioContext)());
-        if (ctx && ctx.state === 'suspended') {
-            ctx.resume().catch(function(){});
-        }
-        
-        _audioUnlocked = true;
-        
-        // Process any queued preloads
-        _preloadQueue.forEach(function(item) {
-            preloadFile(item.folder, item.name);
-        });
-        _preloadQueue = [];
-        
-        // Remove listeners after first trigger
-        document.removeEventListener('touchstart', unlockAudio);
-        document.removeEventListener('mousedown', unlockAudio);
-        document.removeEventListener('keydown', unlockAudio);
-    }
-// DEBUG: Console logging for audio preloader
-window.addEventListener('message', function(e) {
-    if (e.data && e.data.type === 'flc_audio_progress') {
-        console.log('🎵 Audio Progress:', e.data.loaded + '/' + e.data.total, 
-                   '| Unlocked:', e.data.unlocked);
-    }
-});
-    // Attach unlock listeners immediately
-    document.addEventListener('touchstart', unlockAudio, {once: true, passive: true});
-    document.addEventListener('mousedown', unlockAudio, {once: true});
-    document.addEventListener('keydown', unlockAudio, {once: true});
-
-    // Preload a single file using RPG Maker's native system
-    function preloadFile(folder, name) {
-        if (!name) return;
-        
-        // Only preload if audio is unlocked OR we're on desktop
-        if (!_audioUnlocked && !('ontouchstart' in window === false)) {
-            // Queue for later on mobile
-            _preloadQueue.push({folder: folder, name: name});
-            return;
-        }
-        
-        // Use RPG Maker's built-in preloading (handles encryption!)
-        if (typeof AudioManager !== 'undefined' && typeof AudioManager.preloadImportantSounds === 'function') {
-            // Create a temporary list for this single file
-            var sounds = [{name: name, volume: 100, pitch: 100, pan: 0}];
-            AudioManager.preloadImportantSounds(sounds, folder);
-        } else {
-            // Fallback: just fetch the file to prime browser cache
-            var ext = getAudioExtension();
-            var path = folder + '/' + name + ext;
-            fetch(path, {method: 'HEAD', mode: 'no-cors'}).catch(function(){});
-        }
-    }
-
-    function getAudioExtension() {
-        var a = document.createElement('audio');
-        return a.canPlayType('audio/ogg; codecs="vorbis"') ? '.rpgmvo' : '.rpgmvm';
-    }
-
-    function preloadList(folder, names) {
-        names.forEach(function(n) { preloadFile(folder, n); });
-    }
-
-    // Hook into RPG Maker startup to preload critical sounds
-    var _origSetup = SceneManager.setup;
-    SceneManager.setup = function() {
-        // Preload critical sounds on game start (after audio unlock)
-        if (_audioUnlocked) {
-            preloadList('audio/bgm', CRITICAL_BGM);
-            preloadList('audio/me', CRITICAL_ME);
-            preloadList('audio/se', CRITICAL_SE);
-        }
-        if (_origSetup) _origSetup.apply(this, arguments);
-    };
-
-    // Also hook AudioManager.createBuffer for dynamic preloading
-    var _hookInstalled = false;
-    var _hookCheck = setInterval(function() {
-        if (typeof AudioManager === 'undefined') return;
-        clearInterval(_hookCheck);
-        if (_hookInstalled) return;
-        _hookInstalled = true;
-
-        var _origCreate = AudioManager.createBuffer;
-        AudioManager.createBuffer = function(folder, name) {
-            // Preload this file if not already cached
-            if (name && _audioUnlocked) {
-                preloadFile(folder, name);
-            }
-            return _origCreate.apply(this, arguments);
-        };
-    }, 100);
-
-})();
-
-
-
-
 window.onload = function() {
     SceneManager.run(Scene_Boot);
     // Prevent the game page from scrolling on mobile when touched
@@ -228,4 +107,137 @@ window.onload = function() {
         }
     };
 
+})();
+
+//=============================================================================
+// FINAL FIX: Audio Unlock + XHR Cache Preloader
+//=============================================================================
+(function() {
+    'use strict';
+
+    // 🎵 ADD YOUR BGM AND ME FILE NAMES HERE (Do NOT include 'audio/' or the extension)
+    // The browser will download these in the background while the user is on the title screen.
+var FILES_TO_PRELOAD = [
+    'bgm/MainTitle', 'bgm/Sword', 'bgm/Sword1', 'bgm/Sword2', 'bgm/antique',
+    'bgm/alonetime', 'bgm/Battle3', 'bgm/Ship1', 'bgm/Ship2', 'bgm/Ship3',
+    'bgm/fenghuang', 'bgm/forest', 'bgm/forest2', 'bgm/fuzai', 'bgm/havewemet',
+    'bgm/heartdoor', 'bgm/justaadream', 'bgm/justafairy', 'bgm/justfairy2', 'bgm/mountaingod',
+    'bgm/ourfriends', 'bgm/pastmemories', 'bgm/pigs', 'bgm/secondlayer', 'bgm/sikbuxiang',
+    'bgm/snow2', 'bgm/snow3', 'bgm/snow4', 'bgm/snowmountain', 'bgm/starsky',
+    'bgm/taotie', 'bgm/taotie2', 'bgm/tianlu', 'bgm/tianlu2', 'bgm/tiger',
+    'bgm/train', 'bgm/trainstation', 'bgm/tutuoni', 'bgm/tutuoni2', 'bgm/yinglong',
+    'bgm/yinglong2', 'bgs/City', 'bgs/Darkness', 'bgs/Drips', 'bgs/Night',
+    'bgs/Quake', 'bgs/River', 'bgs/Sea', 'bgs/Storm1', 'bgs/Storm2',
+    'bgs/Wind', 'bgs/avalanche', 'bgs/beach', 'bgs/citynight', 'bgs/clock',
+    'bgs/factory', 'bgs/heart', 'bgs/snow1', 'bgs/snow2', 'bgs/trainBGS',
+    'bgs/youshouyan', 'me/Curse1', 'me/Curse2', 'me/Defeat1', 'me/Defeat2',
+    'me/Fanfare1', 'me/Fanfare2', 'me/Gameover1', 'me/Gameover2', 'me/Inn',
+    'me/Musical1', 'me/Musical2', 'me/Musical3', 'me/Mystery', 'me/Organ',
+    'me/Shock1', 'me/Shock2', 'me/Victory1', 'me/Victory2', 'se/Absorb1',
+    'se/Absorb2', 'se/Applause1', 'se/Applause2', 'se/Attack1', 'se/Attack2',
+    'se/Attack3', 'se/Battle1', 'se/Battle2', 'se/Battle3', 'se/Bell1',
+    'se/Bell2', 'se/Bell3', 'se/Blind', 'se/Blow1', 'se/Blow2',
+    'se/Blow3', 'se/Book1', 'se/Book2', 'se/Break', 'se/Buzzer1',
+    'se/Buzzer2', 'se/CD', 'se/Cancel1', 'se/Cancel2', 'se/Cat',
+    'se/Chest1', 'se/Chest2', 'se/Close1', 'se/Close2', 'se/Close3',
+    'se/Coin', 'se/Collapse1', 'se/Collapse2', 'se/Collapse3', 'se/Collapse4',
+    'se/Computer', 'se/Cow', 'se/Crash', 'se/Crossbow', 'se/Crow',
+    'se/Cursor1', 'se/Cursor2', 'se/Damage1', 'se/Damage2', 'se/Damage3',
+    'se/Damage4', 'se/Damage5', 'se/Darkness1', 'se/Darkness2', 'se/Darkness3',
+    'se/Darkness4', 'se/Darkness5', 'se/Decision1', 'se/Decision2', 'se/Devil1',
+    'se/Devil2', 'se/Disappointment', 'se/Dive', 'se/Dog', 'se/Door1',
+    'se/Door2', 'se/Door3', 'se/Door4', 'se/Down1', 'se/Down2',
+    'se/Earth1', 'se/Earth2', 'se/Earth3', 'se/Earth4', 'se/Earth5',
+    'se/Electrocardiogram', 'se/Equip1', 'se/Equip2', 'se/Evasion1', 'se/Evasion2',
+    'se/Explosion1', 'se/Explosion2', 'se/Fall', 'se/Fire1', 'se/Fire2',
+    'se/Fire3', 'se/Flash1', 'se/Flash2', 'se/Frog', 'se/GAMEOVER_M',
+    'se/GAMEOVER_R', 'se/Growl', 'se/Gun1', 'se/Gun2', 'se/Hammer',
+    'se/Heal1', 'se/Heal2', 'se/Heal3', 'se/Horn', 'se/Horse',
+    'se/Ice1', 'se/Ice2', 'se/Ice3', 'se/Ice4', 'se/Ice5',
+    'se/Item1', 'se/Item2', 'se/Item3', 'se/Jump1', 'se/Jump2',
+    'se/Key', 'se/Knock', 'se/Laser1', 'se/Laser2', 'se/Laugh',
+    'se/Launch', 'se/Leakage', 'se/Liquid', 'se/Load', 'se/Machine',
+    'se/Magic1', 'se/Magic2', 'se/Magic3', 'se/Magic4', 'se/Miss',
+    'se/Monster1', 'se/Monster2', 'se/Monster3', 'se/Monster4', 'se/Monster5',
+    'se/Move1', 'se/Move2', 'se/Move3', 'se/Move4', 'se/Move5',
+    'se/Neon', 'se/Noise', 'se/Open1', 'se/Open2', 'se/Open3',
+    'se/Open4', 'se/Open5', 'se/Paralyze1', 'se/Paralyze2', 'se/Paralyze3',
+    'se/Parry', 'se/Phone', 'se/Poison', 'se/Pollen', 'se/Powerup',
+    'se/Push', 'se/Raise1', 'se/Raise2', 'se/Recovery', 'se/Reflection',
+    'se/Run', 'se/Saint1', 'se/Saint2', 'se/Saint3', 'se/Saint4',
+    'se/Saint5', 'se/Sand', 'se/Save', 'se/Scream', 'se/Sheep',
+    'se/Shop1', 'se/Shop2', 'se/Shot1', 'se/Shot2', 'se/Shot3',
+    'se/Silence', 'se/Siren', 'se/Skill1', 'se/Skill2', 'se/Skill3',
+    'se/Slash1', 'se/Slash2', 'se/Slash3', 'se/Slash4', 'se/Slash5',
+    'se/Sleep', 'se/Sound1', 'se/Sound2', 'se/Sound3', 'se/Splash',
+    'se/Stare', 'se/Starlight', 'se/Switch1', 'se/Switch2', 'se/Switch3',
+    'se/Sword1', 'se/Sword2', 'se/Sword3', 'se/Sword4', 'se/Sword5',
+    'se/Teleport', 'se/Thunder1', 'se/Thunder10', 'se/Thunder2', 'se/Thunder3',
+    'se/Thunder4', 'se/Thunder5', 'se/Thunder6', 'se/Thunder7', 'se/Thunder8',
+    'se/Thunder9', 'se/Transceiver', 'se/Twine', 'se/Up1', 'se/Up2',
+    'se/Up3', 'se/Up4', 'se/Water1', 'se/Water2', 'se/Water3',
+    'se/Water4', 'se/Water5', 'se/Wind1', 'se/Wind2', 'se/Wind3',
+    'se/Wind4', 'se/Wind5', 'se/Wind6', 'se/Wind7', 'se/Wolf',
+    'se/chew', 'se/click', 'se/cook', 'se/crash2', 'se/cut',
+    'se/deerrecovery', 'se/dig', 'se/ding', 'se/ducktoy', 'se/fenghuang',
+    'se/fenghuang2', 'se/fenghuang3', 'se/freeze', 'se/gameover_3', 'se/gather',
+    'se/get1', 'se/ink', 'se/inkloong', 'se/key2', 'se/money',
+    'se/pill', 'se/pill2', 'se/starsand', 'se/stick', 'se/suck1',
+    'se/suck2', 'se/taotaotun', 'se/tiger', 'se/tiger2', 'se/trainSE',
+    'se/water', 'se/wine', 'se/wirte',
+];
+
+
+    var _audioUnlocked = false;
+
+    // 1. Unlock AudioContext (Required for iOS/Android)
+    function unlockAudio() {
+        if (_audioUnlocked) return;
+        var AC = window.AudioContext || window.webkitAudioContext;
+        if (AC) {
+            try {
+                var ctx = new AC();
+                if (ctx.state === 'suspended') ctx.resume().catch(function(){});
+            } catch(e) {}
+        }
+        _audioUnlocked = true;
+    }
+
+    // Listen for local screen taps/clicks
+    document.addEventListener('touchstart', unlockAudio, {once: true, passive: true});
+    document.addEventListener('mousedown', unlockAudio, {once: true});
+    document.addEventListener('keydown', unlockAudio, {once: true});
+
+    // Listen for the "Unlock" signal from your wrapper page
+    window.addEventListener('message', function(e) {
+        if (e.data && e.data.type === 'flc_unlock_audio') unlockAudio();
+    });
+
+    // 2. Preload files into HTTP Cache (Fixes the 10-15s network delay)
+    function getExt() {
+        var a = document.createElement('audio');
+        return a.canPlayType('audio/ogg; codecs="vorbis"') ? '.rpgmvo' : '.rpgmvm';
+    }
+
+    function preloadViaXHR(url) {
+        var xhr = new XMLHttpRequest();
+        xhr.open('GET', url, true);
+        xhr.responseType = 'arraybuffer';
+        // Sending this forces the browser to download the file and store it in the HTTP cache.
+        xhr.send(); 
+    }
+
+    // Wait for RPG Maker to initialize, then start downloading in the background
+    var _checkReady = setInterval(function() {
+        if (typeof AudioManager !== 'undefined') {
+            clearInterval(_checkReady);
+            // Start downloading 2 seconds after the game boots up
+            setTimeout(function() {
+                var ext = getExt();
+                FILES_TO_PRELOAD.forEach(function(file) {
+                    preloadViaXHR('audio/' + file + ext);
+                });
+            }, 2000); 
+        }
+    }, 500);
 })();
