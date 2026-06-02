@@ -5,11 +5,12 @@
 PluginManager.setup($plugins);
 
 //=============================================================================
-// Audio Preloader - MOBILE-FIXED VERSION
+// Mobile Audio Fix - RPG Maker Native Approach
 //=============================================================================
 (function() {
     'use strict';
 
+    // Critical sounds to preload (RPG Maker will handle decryption)
     var CRITICAL_BGM = ['MainTitle','Battle3','Ship1','Ship2','Ship3'];
     var CRITICAL_ME  = ['Victory1','Defeat1','Gameover2'];
     var CRITICAL_SE  = ['Cursor2','Decision1','Cancel2','Buzzer1','Equip1',
@@ -18,38 +19,28 @@ PluginManager.setup($plugins);
                         'Recovery','Miss','Evasion1','Evasion2','Reflection',
                         'Shop1','Item3'];
 
-    var _ctx = null;
-    var _cache = {};
-    var _fetching = {};
-    var _total = 0;
-    var _loaded = 0;
     var _audioUnlocked = false;
+    var _preloadQueue = [];
 
-    function getCtx() {
-        if (_ctx) return _ctx;
-        var AC = window.AudioContext || window.webkitAudioContext;
-        if (!AC) return null;
-        try { 
-            _ctx = new AC(); 
-            if (_ctx.state === 'suspended') {
-                _ctx.resume().catch(function(){});
-            }
-        } catch(e) {}
-        return _ctx;
-    }
-
+    // Unlock audio on first user gesture (required for mobile)
     function unlockAudio() {
         if (_audioUnlocked) return;
-        var ctx = getCtx();
+        
+        // Resume AudioContext if it exists
+        var ctx = window.AudioContext && (new (window.AudioContext || window.webkitAudioContext)());
         if (ctx && ctx.state === 'suspended') {
-            ctx.resume().then(function() {
-                _audioUnlocked = true;
-                startPreloading();
-            }).catch(function(){});
-        } else if (ctx) {
-            _audioUnlocked = true;
-            startPreloading();
+            ctx.resume().catch(function(){});
         }
+        
+        _audioUnlocked = true;
+        
+        // Process any queued preloads
+        _preloadQueue.forEach(function(item) {
+            preloadFile(item.folder, item.name);
+        });
+        _preloadQueue = [];
+        
+        // Remove listeners after first trigger
         document.removeEventListener('touchstart', unlockAudio);
         document.removeEventListener('mousedown', unlockAudio);
         document.removeEventListener('keydown', unlockAudio);
@@ -60,141 +51,67 @@ PluginManager.setup($plugins);
     document.addEventListener('mousedown', unlockAudio, {once: true});
     document.addEventListener('keydown', unlockAudio, {once: true});
 
-    function getExt() {
+    // Preload a single file using RPG Maker's native system
+    function preloadFile(folder, name) {
+        if (!name) return;
+        
+        // Only preload if audio is unlocked OR we're on desktop
+        if (!_audioUnlocked && !('ontouchstart' in window === false)) {
+            // Queue for later on mobile
+            _preloadQueue.push({folder: folder, name: name});
+            return;
+        }
+        
+        // Use RPG Maker's built-in preloading (handles encryption!)
+        if (typeof AudioManager !== 'undefined' && typeof AudioManager.preloadImportantSounds === 'function') {
+            // Create a temporary list for this single file
+            var sounds = [{name: name, volume: 100, pitch: 100, pan: 0}];
+            AudioManager.preloadImportantSounds(sounds, folder);
+        } else {
+            // Fallback: just fetch the file to prime browser cache
+            var ext = getAudioExtension();
+            var path = folder + '/' + name + ext;
+            fetch(path, {method: 'HEAD', mode: 'no-cors'}).catch(function(){});
+        }
+    }
+
+    function getAudioExtension() {
         var a = document.createElement('audio');
         return a.canPlayType('audio/ogg; codecs="vorbis"') ? '.rpgmvo' : '.rpgmvm';
     }
 
-    function sendProgress() {
-        try {
-            if (window.parent && window.parent !== window) {
-                window.parent.postMessage({
-                    type: 'flc_audio_progress',
-                    loaded: _loaded,
-                    total: _total,
-                    unlocked: _audioUnlocked
-                }, '*');
-            }
-        } catch(e) {}
+    function preloadList(folder, names) {
+        names.forEach(function(n) { preloadFile(folder, n); });
     }
 
-    function preload(path) {
-        if (_cache[path] || _fetching[path]) return;
-        
-        var ctx = getCtx();
-        if (!ctx || (ctx.state !== 'running' && !_audioUnlocked)) {
-            if (!_fetching[path]) {
-                _fetching[path] = 'pending';
-                _total++;
-                sendProgress();
-            }
-            return;
+    // Hook into RPG Maker startup to preload critical sounds
+    var _origSetup = SceneManager.setup;
+    SceneManager.setup = function() {
+        // Preload critical sounds on game start (after audio unlock)
+        if (_audioUnlocked) {
+            preloadList('audio/bgm', CRITICAL_BGM);
+            preloadList('audio/me', CRITICAL_ME);
+            preloadList('audio/se', CRITICAL_SE);
         }
-        
-        if (_fetching[path] === true) return;
-        _fetching[path] = true;
-        _total++;
-        sendProgress();
+        if (_origSetup) _origSetup.apply(this, arguments);
+    };
 
-        var xhr = new XMLHttpRequest();
-        xhr.open('GET', path, true);
-        xhr.responseType = 'arraybuffer';
-        xhr.onload = function() {
-            if (xhr.status !== 200) { cleanup(); return; }
-            var context = getCtx();
-            if (!context) { cleanup(); return; }
-            
-            context.decodeAudioData(xhr.response,
-                function(buf) { 
-                    _cache[path] = buf; 
-                    _loaded++; 
-                    sendProgress(); 
-                },
-                function(err) { 
-                    console.warn('Decode failed for ' + path, err);
-                    cleanup(); 
-                }
-            );
-        };
-        xhr.onerror = function() { cleanup(); };
-        xhr.ontimeout = function() { cleanup(); };
-        xhr.timeout = 10000;
-        
-        try { 
-            xhr.send(); 
-        } catch(e) { 
-            cleanup(); 
-        }
-        
-        function cleanup() {
-            _loaded++;
-            sendProgress();
-        }
-    }
-
-    function preloadList(folder, names, ext) {
-        names.forEach(function(n) { 
-            if (n) preload(folder + '/' + n + ext); 
-        });
-    }
-
-    function startPreloading() {
-        var ext = getExt();
-        preloadList('audio/bgm', CRITICAL_BGM, ext);
-        preloadList('audio/me',  CRITICAL_ME,  ext);
-        preloadList('audio/se',  CRITICAL_SE,  ext);
-    }
-    
-    var ctx = getCtx();
-    if (ctx && ctx.state === 'running') {
-        startPreloading();
-    }
-
+    // Also hook AudioManager.createBuffer for dynamic preloading
     var _hookInstalled = false;
-    var _hookInterval = setInterval(function() {
+    var _hookCheck = setInterval(function() {
         if (typeof AudioManager === 'undefined') return;
-        clearInterval(_hookInterval);
+        clearInterval(_hookCheck);
         if (_hookInstalled) return;
         _hookInstalled = true;
 
         var _origCreate = AudioManager.createBuffer;
         AudioManager.createBuffer = function(folder, name) {
-            if (name) {
-                var path = folder + '/' + name + getExt();
-                if (_audioUnlocked || (getCtx() && getCtx().state === 'running')) {
-                    preload(path);
-                }
+            // Preload this file if not already cached
+            if (name && _audioUnlocked) {
+                preloadFile(folder, name);
             }
             return _origCreate.apply(this, arguments);
         };
-
-        if (typeof WebAudio !== 'undefined' && WebAudio.prototype) {
-            var _origLoad = WebAudio.prototype._load;
-            if (_origLoad) {
-                WebAudio.prototype._load = function(url) {
-                    var lookupUrl = url;
-                    if (url.indexOf('://') === -1 && url[0] !== '/') {
-                        lookupUrl = url;
-                    }
-                    
-                    var cached = _cache[lookupUrl] || _cache[url.replace(/^\.\//, '')];
-                    
-                    if (cached && this._context) {
-                        try {
-                            this._buffer = cached;
-                            this._totalTime = cached.duration;
-                            if (typeof this._onLoad === 'function') {
-                                this._onLoad();
-                            }
-                            return true;
-                        } catch(e) {
-                            console.warn('Cache playback failed', e);
-                        }
-                    }
-                    return _origLoad.apply(this, arguments);
-                };
-            }
-        }
     }, 100);
 
 })();
@@ -307,10 +224,21 @@ window.onload = function() {
 
 })();
 
-// DEBUG: Console logging for audio preloader
-window.addEventListener('message', function(e) {
-    if (e.data && e.data.type === 'flc_audio_progress') {
-        console.log('🎵 Audio Progress:', e.data.loaded + '/' + e.data.total, 
-                   '| Unlocked:', e.data.unlocked);
+// === DEBUG: Audio Preload Status ===
+console.log('🎮 Game loaded | Audio unlocked:', typeof _audioUnlocked !== 'undefined' ? _audioUnlocked : 'N/A');
+
+// Log when critical sounds are requested
+if (typeof AudioManager !== 'undefined') {
+    var _origMake = AudioManager.makeAudioBuffer;
+    if (_origMake) {
+        AudioManager.makeAudioBuffer = function(folder, name) {
+            console.log('🔊 Requesting:', folder + '/' + name);
+            return _origMake.apply(this, arguments);
+        };
     }
-});
+}
+
+// Log touch events for debugging
+document.addEventListener('touchstart', function(e) {
+    console.log('👆 Touch detected at', new Date().toISOString());
+}, {passive: true});
