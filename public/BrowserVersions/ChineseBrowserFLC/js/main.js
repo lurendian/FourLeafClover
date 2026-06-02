@@ -110,30 +110,77 @@ window.onload = function() {
 })();
 
 (function() {
-    // Check every 10ms to beat the engine's initialization
-    var _forceExt = setInterval(function() {
+    var _audioUnlocked = false;
+
+    // 1. AUDIO UNLOCK (Satisfies mobile browser gesture requirements)
+    function unlockAudio() {
+        if (_audioUnlocked) return;
+        var AC = window.AudioContext || window.webkitAudioContext;
+        if (AC) {
+            try {
+                var ctx = new AC();
+                if (ctx.state === 'suspended') ctx.resume().catch(function(){});
+            } catch(e) {}
+        }
+        _audioUnlocked = true;
+    }
+
+    // Listen for local screen taps/clicks
+    document.addEventListener('touchstart', unlockAudio, {once: true, passive: true});
+    document.addEventListener('mousedown', unlockAudio, {once: true});
+    document.addEventListener('keydown', unlockAudio, {once: true});
+
+    // Listen for the "Unlock" signal from your wrapper page (index.html)
+    window.addEventListener('message', function(e) {
+        if (e.data && e.data.type === 'flc_unlock_audio') unlockAudio();
+    });
+
+    // 2. WAIT FOR RPG MAKER TO BOOT, THEN APPLY ALL FIXES
+    var _masterInit = setInterval(function() {
         if (typeof AudioManager !== 'undefined') {
-            clearInterval(_forceExt);
-            
-            // 1. Hijack the exact function that returns the extension string
+            clearInterval(_masterInit);
+
+            // --- A. NUCLEAR OPTION: Force .m4a and Kill Encryption Flags ---
             AudioManager.audioFileExt = function() { return ".m4a"; };
-            
-            // 2. Overwrite the internal cached booleans
             AudioManager._canPlayOgg = false;
             AudioManager._canPlayM4a = true;
             
-            // 3. Kill the Decrypter if it exists (Stops .rpgmvo/.rpgmvm requests)
             if (typeof Decrypter !== 'undefined') {
                 Decrypter.hasEncryptedAudio = false;
                 Decrypter.hasEncryptedImages = false;
             }
-            
-            // 4. MZ Compatibility (just in case you are using MZ)
             if (typeof WebAudio !== 'undefined' && WebAudio._extension !== undefined) {
                 WebAudio._extension = ".m4a";
             }
-            
-            console.log("🔊 FORCED AUDIO EXTENSION TO: .m4a");
+
+            // --- B. SILVER BULLET: Force HTML5 Audio Streaming ---
+            // This forces the browser to use the native <audio> tag, which streams
+            // instantly on mobile instead of waiting to download the whole file into RAM.
+            AudioManager.shouldUseHtml5Audio = function() { return true; };
+            AudioManager._shouldUseHtml5 = true; 
+
+            // --- C. XHR CACHE WARMER (Backup for WebAudio fallback) ---
+            // 👇 PASTE YOUR PYTHON SCRIPT OUTPUT INSIDE THESE BRACKETS 👇
+            var FILES_TO_PRELOAD = [
+                'bgm/MainTitle', 'bgm/Battle1', 'bgm/Town1', 
+                'se/Cursor2', 'se/Decision1', 'me/Victory1'
+                // ... paste the rest of your python script list here ...
+            ];
+
+            var ext = '.m4a'; 
+
+            // Start downloading 2 seconds after boot (while user is on Title Screen)
+            setTimeout(function() {
+                FILES_TO_PRELOAD.forEach(function(file) {
+                    var xhr = new XMLHttpRequest();
+                    xhr.open('GET', 'audio/' + file + ext, true);
+                    xhr.responseType = 'arraybuffer';
+                    xhr.send(); 
+                });
+                console.log("🔥 Cache warmer started for " + FILES_TO_PRELOAD.length + " files");
+            }, 2000);
+
+            console.log("🔊 MASTER FIX APPLIED: .m4a forced, HTML5 streaming enabled.");
         }
-    }, 10); 
+    }, 100); 
 })();
