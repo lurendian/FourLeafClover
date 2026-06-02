@@ -268,34 +268,77 @@ var FILES_TO_PRELOAD = [
 })();
 
 //=============================================================================
-// Solution 1: Native Long-Press Hint & Ghost-Step Patch
+// Bulletproof Mobile Touch: Custom Long-Press & 2-Finger Tap Fix
 //=============================================================================
 (function() {
     var _check = setInterval(function() {
         if (typeof TouchInput !== 'undefined' && typeof SceneManager !== 'undefined') {
             clearInterval(_check);
             
-            // Only apply to touch devices
             var isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
             if (!isTouchDevice) return;
 
-            // 2. Patch the 2-Finger "Ghost Step" Bug
-            // We intercept the touch event. If a second finger touches the screen, 
-            // we instantly revoke the movement command so the character stays perfectly still.
-            var _origTouchStart = TouchInput._onTouchStart;
+            // Helper: Simulate Escape Key & Wipe Movement Queue
+            function simulateEscape() {
+                var options = { key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true, cancelable: true };
+                document.dispatchEvent(new KeyboardEvent('keydown', options));
+                setTimeout(function() {
+                    document.dispatchEvent(new KeyboardEvent('keyup', options));
+                }, 100);
+                
+                // Force clear TouchInput state to prevent the "Ghost Step"
+                if (typeof TouchInput !== 'undefined') TouchInput.clear();
+            }
+
+            var _longPressTimer = null;
+            var _isLongPressing = false;
+
+            // 1. Intercept Touch Start
+            var _origTouchStart = TouchInput._onTouchStart.bind(TouchInput);
             TouchInput._onTouchStart = function(event) {
+                // Detect 2-Finger Tap
                 if (event.touches.length >= 2) {
-                    this._triggered = false; // 🛑 Stops the character from moving
-                    this._onCancel();        // ✅ Opens the menu safely
+                    event.preventDefault();
+                    this.clear(); // 🛑 Wipe any movement from the first finger
+                    simulateEscape(); // ✅ Open Menu / Cancel
+                    _isLongPressing = false;
+                    clearTimeout(_longPressTimer);
                     return;
                 }
-                // Fallback to standard single-finger behavior
-                for (var i = 0; i < event.changedTouches.length; i++) {
-                    this._onLeftButtonDown(event);
-                }
+
+                // Single Finger: Run original logic safely
+                _origTouchStart(event);
+
+                // Start Custom Long-Press Timer (600ms)
+                clearTimeout(_longPressTimer);
+                _isLongPressing = false;
+                _longPressTimer = setTimeout(function() {
+                    _isLongPressing = true;
+                    TouchInput.clear(); // 🛑 Stop movement
+                    simulateEscape(); // ✅ Open Menu / Cancel
+                }, 600);
             };
 
-            console.log("📱 Long-Press Hint & Ghost-Step Patch Active.");
+            // 2. Intercept Touch Move (Cancel long-press if they drag to walk)
+            var _origTouchMove = TouchInput._onTouchMove.bind(TouchInput);
+            TouchInput._onTouchMove = function(event) {
+                clearTimeout(_longPressTimer); // If they move, it's a walk, not a menu tap
+                _origTouchMove(event);
+            };
+
+            // 3. Intercept Touch End (Block click if it was a long press)
+            var _origTouchEnd = TouchInput._onTouchEnd.bind(TouchInput);
+            TouchInput._onTouchEnd = function(event) {
+                clearTimeout(_longPressTimer);
+                if (_isLongPressing) {
+                    this.clear(); // Prevent the "release" from triggering a step
+                    _isLongPressing = false;
+                    return; 
+                }
+                _origTouchEnd(event);
+            };
+
+            console.log("📱 Bulletproof 2-Finger & Long-Press Patch Active.");
         }
     }, 500);
 })();
