@@ -266,3 +266,36 @@ var FILES_TO_PRELOAD = [
         }
     }, 100); 
 })();
+
+//=============================================================================
+// Solution 1: Native Long-Press Hint & Ghost-Step Patch
+//=============================================================================
+(function() {
+    var _check = setInterval(function() {
+        if (typeof TouchInput !== 'undefined' && typeof SceneManager !== 'undefined') {
+            clearInterval(_check);
+            
+            // Only apply to touch devices
+            var isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
+            if (!isTouchDevice) return;
+
+            // 2. Patch the 2-Finger "Ghost Step" Bug
+            // We intercept the touch event. If a second finger touches the screen, 
+            // we instantly revoke the movement command so the character stays perfectly still.
+            var _origTouchStart = TouchInput._onTouchStart;
+            TouchInput._onTouchStart = function(event) {
+                if (event.touches.length >= 2) {
+                    this._triggered = false; // 🛑 Stops the character from moving
+                    this._onCancel();        // ✅ Opens the menu safely
+                    return;
+                }
+                // Fallback to standard single-finger behavior
+                for (var i = 0; i < event.changedTouches.length; i++) {
+                    this._onLeftButtonDown(event);
+                }
+            };
+
+            console.log("📱 Long-Press Hint & Ghost-Step Patch Active.");
+        }
+    }, 500);
+})();
