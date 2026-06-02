@@ -231,8 +231,6 @@ window.onload = function() {
     'se/water', 'se/wine', 'se/wirte',
 ];
 
-            ];
-
             var ext = '.m4a'; 
 
             // Start downloading 2 seconds after boot (while user is on Title Screen)
