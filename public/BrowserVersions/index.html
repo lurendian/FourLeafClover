@@ -87,6 +87,56 @@
     .audio-progress-fill { height: 100%; width: 0%; background: var(--accent); border-radius: 8px; transition: width 0.3s ease; }
     .audio-progress-label { width: 100%; max-width: 1200px; margin-top: 6px; font-size: 12px; color: var(--text-muted); text-align: center; transition: opacity 0.5s ease; }
     .audio-progress-label.hidden { opacity: 0; pointer-events: none; }
+	    /* Audio Warning Modal */
+    .audio-warning-modal {
+        position: absolute;
+        inset: 0;
+        background: rgba(10, 14, 10, 0.85);
+        backdrop-filter: blur(8px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        z-index: 1006; /* Sits right above the "Tap to Play" overlay */
+        transition: opacity 0.4s ease;
+    }
+    .audio-warning-modal.hidden {
+        opacity: 0;
+        pointer-events: none;
+    }
+    .audio-warning-content {
+        background: var(--bg-secondary);
+        border: 1px solid var(--border-color);
+        border-radius: 20px;
+        padding: 30px 24px;
+        max-width: 380px;
+        width: 90%;
+        text-align: center;
+        box-shadow: var(--shadow-game);
+        display: flex;
+        flex-direction: column;
+        gap: 16px;
+        animation: modalPop 0.4s cubic-bezier(.4,0,.2,1);
+    }
+    @keyframes modalPop {
+        0% { transform: scale(0.9); opacity: 0; }
+        100% { transform: scale(1); opacity: 1; }
+    }
+    .audio-warning-icon { font-size: 42px; line-height: 1; }
+    .audio-warning-content h3 { color: var(--text-primary); font-size: 20px; margin: 0; font-weight: 600; }
+    .audio-warning-content p { color: var(--text-secondary); font-size: 14px; line-height: 1.6; margin: 0; }
+    .audio-warning-checkbox {
+        display: flex; align-items: center; justify-content: center; gap: 8px;
+        color: var(--text-muted); font-size: 13px; cursor: pointer; user-select: none; margin-top: 4px;
+    }
+    .audio-warning-checkbox input { accent-color: var(--accent); cursor: pointer; width: 16px; height: 16px; }
+    .audio-warning-btn {
+        background: linear-gradient(135deg, var(--accent), var(--accent-hover));
+        color: #0a0e0a; border: none; padding: 12px 24px; border-radius: 12px;
+        font-size: 15px; font-weight: 700; cursor: pointer; transition: var(--trans-fast);
+        box-shadow: 0 4px 16px rgba(46,204,113,.35); margin-top: 8px;
+    }
+    .audio-warning-btn:hover { transform: translateY(-2px); box-shadow: 0 8px 28px rgba(46,204,113,.5); }
+    .audio-warning-btn:active { transform: scale(0.98); }
   </style>
 </head>
 <body>
@@ -108,6 +158,20 @@
       <div class="audio-overlay-content">
         <div class="play-icon">▶</div>
         <div data-i18n="tapToPlay" style="font-size: 18px; font-weight: 600;">Tap to Play</div>
+      </div>
+    </div>
+	
+	    <!-- Audio Warning Popup -->
+    <div class="audio-warning-modal hidden" id="audioWarningModal">
+      <div class="audio-warning-content">
+        <div class="audio-warning-icon">🎵</div>
+        <h3 data-i18n="warningTitle">Audio Loading...</h3>
+        <p data-i18n="warningText">Please wait a few seconds for the main menu music to start playing before clicking "New Game" to ensure the best audio experience.</p>
+        <label class="audio-warning-checkbox">
+          <input type="checkbox" id="dontShowAgainCheckbox">
+          <span data-i18n="dontShowAgain">Don't show this again</span>
+        </label>
+        <button class="audio-warning-btn" id="closeWarningBtn" data-i18n="understood">Understood</button>
       </div>
     </div>
 
@@ -295,6 +359,41 @@
       if (e.key.toLowerCase() === 'h') { e.preventDefault(); $('#hideUiBtn')?.click(); }
       if (e.key === 'Escape' && !uiVisible) $('#hideUiBtn')?.click();
     });
+
+    // --- Audio Warning Modal Logic ---
+    const warningModal = document.getElementById('audioWarningModal');
+    const closeWarningBtn = document.getElementById('closeWarningBtn');
+    const dontShowAgainCheckbox = document.getElementById('dontShowAgainCheckbox');
+
+    // We use a MutationObserver to watch the "Tap to Play" overlay.
+    // When the user taps play and the overlay fades out, we trigger the warning modal.
+    if (els.audioOverlay && warningModal) {
+        const observer = new MutationObserver((mutations) => {
+            mutations.forEach((mutation) => {
+                if (mutation.attributeName === 'class' && els.audioOverlay.classList.contains('hidden')) {
+                    // Check if the user previously selected "Don't show again"
+                    if (localStorage.getItem('clover_hide_audio_warning') !== 'true') {
+                        setTimeout(() => {
+                            warningModal.classList.remove('hidden');
+                        }, 500); // 500ms delay so it doesn't flash exactly as the tap overlay fades
+                    }
+                    observer.disconnect(); // Stop observing once triggered
+                }
+            });
+        });
+        observer.observe(els.audioOverlay, { attributes: true });
+    }
+
+    // Handle the "Understood" button click
+    if (closeWarningBtn) {
+        closeWarningBtn.addEventListener('click', () => {
+            if (dontShowAgainCheckbox && dontShowAgainCheckbox.checked) {
+                localStorage.setItem('clover_hide_audio_warning', 'true');
+            }
+            warningModal.classList.add('hidden');
+            if (els.frame) els.frame.focus(); // Return focus to the game so they can click New Game
+        });
+    }
 
     fetch('./game-config.json?t=' + Date.now())
       .then(r => r.json())
