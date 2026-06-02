@@ -265,83 +265,83 @@ var FILES_TO_PRELOAD = [
             console.log("🔊 MASTER FIX v4 APPLIED: Smart Routing Active.");
         }
     }, 100); 
-})();
-//=============================================================================
-// Bulletproof Mobile Touch: Capture-Phase Interceptor
+})();//=============================================================================
+// Smart Touch: Ghost-Step Wipe & Text-Skip Preservation
 //=============================================================================
 (function() {
     var isTouchDevice = ('ontouchstart' in window) || (navigator.maxTouchPoints > 0);
     if (!isTouchDevice) return;
 
-    var longPressTimer = null;
-    var longPressTriggered = false;
-    var startX = 0, startY = 0;
+    var checkReady = setInterval(function() {
+        if (typeof TouchInput === 'undefined' || typeof SceneManager === 'undefined' || typeof $gameTemp === 'undefined') return;
+        clearInterval(checkReady);
 
-    function simulateEscape() {
-        var options = { key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true, cancelable: true };
-        document.dispatchEvent(new KeyboardEvent('keydown', options));
-        setTimeout(function() {
-            document.dispatchEvent(new KeyboardEvent('keyup', options));
-        }, 50);
-    }
+        var longPressTimer = null;
+        var startX = 0, startY = 0;
 
-    function clearRpgTouch() {
-        if (typeof TouchInput !== 'undefined') {
-            TouchInput.clear();
-            // Force reset internal states to prevent ghost steps
-            if (TouchInput._mousePressed !== undefined) TouchInput._mousePressed = 0;
-            if (TouchInput._screenPressed !== undefined) TouchInput._screenPressed = false;
-            if (TouchInput._pressedTime !== undefined) TouchInput._pressedTime = 0;
-        }
-    }
-
-    // 1. Intercept Touch Start (Capture Phase - happens BEFORE RPG Maker sees it)
-    document.addEventListener('touchstart', function(e) {
-        if (e.touches.length >= 2) {
-            // 🛑 2-Finger Tap Detected!
-            e.preventDefault();
-            e.stopImmediatePropagation(); // Blocks RPG Maker from seeing this touch
-            clearRpgTouch();
-            simulateEscape();
-            clearTimeout(longPressTimer);
-            longPressTriggered = false;
-            return;
+        function simulateEscape() {
+            var options = { key: 'Escape', code: 'Escape', keyCode: 27, which: 27, bubbles: true, cancelable: true };
+            document.dispatchEvent(new KeyboardEvent('keydown', options));
+            setTimeout(function() {
+                document.dispatchEvent(new KeyboardEvent('keyup', options));
+            }, 50);
         }
 
-        // 👇 Single Finger: Start Long-Press Timer
-        startX = e.touches[0].clientX;
-        startY = e.touches[0].clientY;
-        longPressTriggered = false;
-        
-        clearTimeout(longPressTimer);
-        longPressTimer = setTimeout(function() {
-            longPressTriggered = true;
-            clearRpgTouch();
-            simulateEscape();
-        }, 600); // 0.6 seconds
-    }, { capture: true, passive: false });
-
-    // 2. Intercept Touch Move (Cancel long-press if dragging to walk)
-    document.addEventListener('touchmove', function(e) {
-        if (e.touches.length === 1) {
-            var dx = e.touches[0].clientX - startX;
-            var dy = e.touches[0].clientY - startY;
-            if (Math.sqrt(dx*dx + dy*dy) > 15) {
-                clearTimeout(longPressTimer);
+        // 🛑 The Ghost-Step Killer: Wipes the movement queue instantly
+        function clearDestination() {
+            if ($gameTemp && typeof $gameTemp.clearDestination === 'function') {
+                $gameTemp.clearDestination();
             }
         }
-    }, { capture: true, passive: true });
 
-    // 3. Intercept Touch End (Block click if it was a long press)
-    document.addEventListener('touchend', function(e) {
-        clearTimeout(longPressTimer);
-        if (longPressTriggered) {
-            e.preventDefault();
-            e.stopImmediatePropagation(); // Blocks RPG Maker from registering a "click"
-            clearRpgTouch();
-            longPressTriggered = false;
+        // Checks if the player is currently reading text or watching a cutscene
+        function isGameBusy() {
+            if (typeof $gameMessage !== 'undefined' && $gameMessage.isBusy()) return true;
+            var scene = SceneManager._scene;
+            if (scene && scene._interpreter && scene._interpreter.isRunning()) return true;
+            return false;
         }
-    }, { capture: true, passive: false });
 
-    console.log("📱 Capture-Phase Touch Interceptor Active.");
+        // We use passive: true so we DON'T block native touch events.
+        // This preserves the "Hold to Skip Text" mechanic perfectly.
+        document.addEventListener('touchstart', function(e) {
+            if (e.touches.length >= 2) {
+                // 🛑 2-Finger Tap Detected!
+                clearDestination(); // Instantly wipes the movement queue (Fixes Ghost Step)
+                if (!isGameBusy()) {
+                    simulateEscape(); // Opens Menu
+                }
+                clearTimeout(longPressTimer);
+                return;
+            }
+
+            // 👇 Single Finger: Start Long-Press Timer
+            startX = e.touches[0].clientX;
+            startY = e.touches[0].clientY;
+            
+            clearTimeout(longPressTimer);
+            longPressTimer = setTimeout(function() {
+                if (!isGameBusy()) {
+                    clearDestination();
+                    simulateEscape();
+                }
+            }, 600); // 0.6 seconds
+        }, { passive: true });
+
+        document.addEventListener('touchmove', function(e) {
+            if (e.touches.length === 1) {
+                var dx = e.touches[0].clientX - startX;
+                var dy = e.touches[0].clientY - startY;
+                if (Math.sqrt(dx*dx + dy*dy) > 15) {
+                    clearTimeout(longPressTimer); // Dragging = Walking, cancel menu timer
+                }
+            }
+        }, { passive: true });
+
+        document.addEventListener('touchend', function(e) {
+            clearTimeout(longPressTimer);
+        }, { passive: true });
+
+        console.log("📱 Smart Touch Active: Ghost-Step Fixed & Text-Skip Preserved.");
+    }, 500);
 })();
