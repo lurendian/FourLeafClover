@@ -222,6 +222,7 @@ window.onload = function() {
         }
     };
 
+<<<<<<< Updated upstream
 })();
 
 // === DEBUG: Audio Preload Status ===
@@ -242,3 +243,6 @@ if (typeof AudioManager !== 'undefined') {
 document.addEventListener('touchstart', function(e) {
     console.log('👆 Touch detected at', new Date().toISOString());
 }, {passive: true});
+=======
+})();
+>>>>>>> Stashed changes
