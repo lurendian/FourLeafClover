@@ -35,3 +35,40 @@
     }
   }
 }
+{
+  "en": {
+    "name": "English",
+    "version": "Chapters 1-2",
+    "credits": "Ported by Tablet pro",
+    "releaseDate": "February 8, 2024",
+    "note": "If you have any issues, please report them here: https://lurendian.atabook.org/",
+    "gameUrl": "https://fourleafclover.lurendian.workers.dev/BrowserVersions/EnglishWebFLC/index.html",
+    "downloadUrl": "",
+    "ui": {
+      "selectLang": "Select Language",
+      "releaseDate": "Release Date",
+      "credits": "Credits",
+      "version": "Version",
+      "note": "Note",
+      "uiVisible": "Interface shown",
+      "uiHidden": "Interface hidden",
+      "downloadStarted": "Download started",
+      "fsNotSupported": "Fullscreen not available",
+      "orientLocked": "Landscape locked",
+      "langSwitched": "Language switched to English",
+      "tapToPlay": "Tap to play",
+      "pageTitle": "Four Leaf Clover - Game Player",
+      "fullscreenTitle": "Fullscreen (F)",
+      "hideUiTitle": "Hide interface (H)",
+      "downloadTitle": "Download game",
+      "errorInvalidPage": "Error: Invalid page structure.",
+      "errorLoadGame": "Failed to load game. Please check the link.",
+      "loadingTimeout": "Loading timed out",
+      "audioUnlocked": "Audio unlocked",
+      "warningTitle": "Loading audio...",
+      "warningText": "If you are playing on a touchscreen, tap the screen with two fingers or press and hold the screen to send an Esc key press. Also, please wait for the main title screen music to finish playing before starting the game.",
+      "dontShowAgain": "Don't show again",
+      "understood": "Got it"
+    }
+  }
+}
