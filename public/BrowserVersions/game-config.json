@@ -4,7 +4,7 @@
     "version": "第1-2章",
     "credits": "由 Tablet pro 移植",
     "releaseDate": "2024年2月8日",
-    "note": "如有任何問題，請至此處回報：https://lurendian.atabook.org/",
+    "note": "如果您使用触摸屏玩游戏，请用两根手指轻触屏幕或长按屏幕以按下Esc键。如有任何問題，請至此處回報：https://lurendian.atabook.org/",
     "gameUrl": "https://fourleafclover.lurendian.workers.dev/BrowserVersions/ChineseBrowserFLC/index.html",
     "downloadUrl": "https://b2-download-gateway.lurendian.workers.dev/ChineseBrowserFLC.zip",
     "ui": {
@@ -39,7 +39,7 @@
     "version": "Chapters 1-2",
     "credits": "Ported by Tablet pro",
     "releaseDate": "February 8, 2024",
-    "note": "If you have any issues, please report them here: https://lurendian.atabook.org/",
+    "note": "If you are playing on a touchscreen, tap the screen with two fingers or press and hold the screen to send an Esc key press. If you have any issues, please report them here: https://lurendian.atabook.org/",
     "gameUrl": "https://fourleafclover.lurendian.workers.dev/BrowserVersions/EnglishWebFLC/index.html",
     "downloadUrl": "",
     "ui": {
